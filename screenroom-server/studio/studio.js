@@ -6,12 +6,29 @@ const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const notify=(msg,good=true)=>{$('notice').textContent=msg;$('notice').style.borderColor=good?'#f5c518':'#ed7272';};
 const jsonForm=form=>Object.fromEntries(new FormData(form));
 async function api(route,options={}){
- const headers={'Accept':'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...options.headers};
- if(!['GET','HEAD'].includes(options.method||'GET')&&csrf)headers['X-SCREENROOM-CSRF']=csrf;
- const r=await fetch(base+route,{credentials:'same-origin',...options,headers});
- let data;try{data=await r.json();}catch{data={error:'Unexpected server response.'};}
- if(!r.ok)throw Error(data.error||'Request failed ('+r.status+').');
- return data;
+ const method=options.method||'GET',mutation=!['GET','HEAD'].includes(method);
+ async function send(){
+  const headers={'Accept':'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...options.headers};
+  if(mutation&&csrf)headers['X-SCREENROOM-CSRF']=csrf;
+  const r=await fetch(base+route,{credentials:'same-origin',...options,headers});
+  let data;try{data=await r.json();}catch{data={error:'Unexpected server response.'};}
+  return {r,data};
+ }
+ let result=await send();
+ if(mutation&&result.r.status===403&&result.data.error==='Invalid CSRF token.'){
+  // Another open tab may have rotated the per-session CSRF token; fetch and retry once.
+  const response=await fetch(base+'/api/admin/csrf',{credentials:'same-origin',headers:{Accept:'application/json'}});
+  if(response.ok){
+   const fresh=await response.json();
+   if(fresh.csrf){
+    csrf=fresh.csrf;
+    sessionStorage.setItem('screenroom_csrf',csrf);
+    result=await send();
+   }
+  }
+ }
+ if(!result.r.ok)throw Error(result.data.error||'Request failed ('+result.r.status+').');
+ return result.data;
 }
 async function attempt(fn){
  try{await fn();}catch(e){notify(e.message||'Unexpected error.',false);}
@@ -116,14 +133,18 @@ $('tmdb-url-form').addEventListener('submit',e=>{e.preventDefault();attempt(asyn
  const target=$('tmdb-target').value;
  const payload={kind,tmdb_url:url};if(target)payload.target_title_id=Number(target);
  $('tmdb-feedback').textContent='Importing metadata from TMDB URL…';
- const d=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify(payload)});
+ let d;
+ try{d=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify(payload)});}
+ catch(error){$('tmdb-feedback').textContent=error.message||'TMDB URL import failed.';throw error;}
  $('tmdb-feedback').textContent=d.created?'TMDB draft created.':'Existing title updated from TMDB.';
  notify($('tmdb-feedback').textContent);await loadTitles();await loadEditor(d.id);
 });});
 $('tmdb-form').addEventListener('submit',e=>{e.preventDefault();attempt(async()=>{
  const form=jsonForm(e.target);
  $('tmdb-feedback').textContent='Searching TMDB…';
- const d=await api('/api/admin/tmdb/search?type='+encodeURIComponent(form.type)+'&q='+encodeURIComponent(form.q));
+ let d;
+ try{d=await api('/api/admin/tmdb/search?type='+encodeURIComponent(form.type)+'&q='+encodeURIComponent(form.q));}
+ catch(error){$('tmdb-feedback').textContent=error.message||'TMDB search failed.';throw error;}
  $('tmdb-feedback').textContent=(d.results?.length||0)+' matching TMDB titles found. Choose the correct release/year.';
  const results=$('tmdb-results');results.replaceChildren();
  if(!d.results?.length){results.innerHTML='<p class="muted">No metadata found.</p>';return;}
