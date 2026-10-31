@@ -31,7 +31,7 @@ return '<div class="detail-hero"><div><p class="crumb"><a href="'+base+'">SCREEN
 function renderDetail(){const t=getTitle(),target=q('#detail-content');if(!target)return;target.innerHTML=detail(t);q('#trailer-btn')?.addEventListener('click',()=>void showTrailer(t));if(t&&t.kind==='series'){const section=document.createElement('section');section.className='panel-section';section.innerHTML='<div class="season-row"><h2>EPISODES<span class="dot">.</span></h2><label><span class="sr-only">Choose season</span><select class="season-select" id="season-picker"></select></label></div><div class="episode-list" id="episode-list"></div>';target.append(section);const select=q('#season-picker');t.seasons.forEach(s=>select.add(new Option('SEASON '+s.number,s.number)));function episodes(){const season=t.seasons.find(s=>String(s.number)===select.value);q('#episode-list').innerHTML=season.episodes.map(e=>'<article class="episode"><div class="episode-image">'+(e.still_url?'<img class="episode-still" src="'+escapeHtml(e.still_url)+'" alt="" loading="lazy">':String(e.number).padStart(2,'0'))+'</div><div><h3>'+escapeHtml(e.title)+'</h3><p>'+escapeHtml(e.description)+'</p><small>S'+season.number+' E'+e.number+' / '+e.length+'</small></div><a class="episode-watch-btn" href="'+playHref(t,season.number,e.number)+'">WATCH NOW</a></article>').join('')}select.addEventListener('change',episodes);episodes()}}
 function renderPlay(){const t=getTitle(),target=q('#playback-content');if(!target)return;if(!t){target.innerHTML='<div class="empty">Invalid title. <a href="'+base+'">BACK TO CATALOG ↗</a></div>';return}const firstSeason=t.kind==='series'?t.seasons.find(s=>s.number===1)||t.seasons[0]:null;const firstEpisode=firstSeason?.episodes.find(e=>e.number===1)||firstSeason?.episodes[0];const season=params.get('season')??(firstSeason?String(firstSeason.number):null),episode=params.get('episode')??(firstEpisode?String(firstEpisode.number):null);const ep=t.kind==='series'?t.seasons.flatMap(s=>s.episodes.map(e=>({...e,season:s.number}))).find(e=>String(e.season)===season&&String(e.number)===episode):null;target.innerHTML='<p class="crumb"><a href="'+base+'">SCREENROOM</a> / <a href="'+titleHref(t)+'">'+escapeHtml(t.title.toUpperCase())+'</a> / PLAYBACK</p><h1 class="detail-headline">'+escapeHtml(t.title.toUpperCase())+'<span class="dot">.</span></h1>'+(ep?'<p class="eyebrow">SEASON '+ep.season+' / EPISODE '+ep.number+' — '+escapeHtml(ep.title)+'</p>':'')+'<div class="player-placeholder" role="status"><span class="eyebrow">SECURESTREAM INTEGRATION</span><strong>STREAM NOT CONNECTED</strong><p>For the live build, an authenticated API will verify the Cloudflare R2 object and return a browser-compatible playback URL to SecureStream Player.</p><a class="outline-link" href="'+titleHref(t)+'">← BACK TO DETAILS</a></div><div class="notice-box">'+previewNotice+'</div>';if(remoteMode)void mountStream(t,ep);}
 let remoteMode=false;
-const API_BASE=location.origin+'/screenroom-api';
+const API_BASE='https://screenroom.devrijonn.com/screenroom-api';
 const mins=n=>n?Math.floor(n/60)+'h '+String(n%60).padStart(2,'0')+'m':'';
 function convertTitle(x){
  return {
@@ -52,7 +52,7 @@ async function getAPI(route){
  return response.json();
 }
 async function hydrateData(){
- if(location.hostname!=='screenroom.devrijonn.com' && location.hostname!=='localhost' && location.hostname!=='127.0.0.1')return;
+ if(location.hostname!=='screenroom.devrijonn.com')return;
  try{
   if(page==='catalog'){
    const data=await getAPI('/api/titles?type=all&page=1');
@@ -65,7 +65,7 @@ async function hydrateData(){
   }
   remoteMode=true;
   previewNotice='Catalog data is managed through SCREENROOM Studio. Playback requires a published, authorized R2 or approved HTTPS media source.';
- }catch(e){console.warn('SCREENROOM: backend not ready; showing local preview data.');}
+ }catch(e){titles=[];remoteMode=false;previewNotice='SCREENROOM catalog is temporarily unavailable. Please try again later.';console.warn('SCREENROOM: backend not ready.');}
 }
 async function mountStream(t,ep){
  const box=document.querySelector('.player-placeholder');

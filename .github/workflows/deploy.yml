@@ -1,0 +1,72 @@
+name: SCREENROOM CI and production deploy
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenroom-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: screenroom-server/package-lock.json
+      - name: Install backend dependencies
+        working-directory: screenroom-server
+        run: npm ci --no-audit --no-fund
+      - name: Backend tests
+        working-directory: screenroom-server
+        run: npm test
+      - name: Syntax and FTPS manifest checks
+        run: |
+          node --check screenroom-server/app.js
+          node --check screenroom-server/studio/studio.js
+          node --check watch/assets/screenroom.js
+          python -m py_compile scripts/deploy_ftps.py
+          python scripts/deploy_ftps.py --mode screenroom-web --dry-run
+          python scripts/deploy_ftps.py --mode screenroom-api --dry-run
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Upload isolated subdomain static frontend
+        run: python scripts/deploy_ftps.py --mode screenroom-web
+        env:
+          FTPS_HOST: nova.hostseba.com
+          FTPS_USERNAME: ${{ secrets.WEB_FTPS_USERNAME }}
+          FTPS_PASSWORD: ${{ secrets.WEB_FTPS_PASSWORD }}
+      - name: Upload cPanel Node app, preserving .env and dependencies
+        run: python scripts/deploy_ftps.py --mode screenroom-api
+        env:
+          FTPS_HOST: nova.hostseba.com
+          FTPS_USERNAME: ${{ secrets.API_FTPS_USERNAME }}
+          FTPS_PASSWORD: ${{ secrets.API_FTPS_PASSWORD }}
+      - name: Confirm frontend and API are reachable
+        run: |
+          python - <<'PY'
+          import urllib.request
+          for url in ('https://screenroom.devrijonn.com/', 'https://screenroom.devrijonn.com/screenroom-api/health'):
+              try:
+                  with urllib.request.urlopen(url, timeout=15) as res:
+                      print(url, res.status)
+              except Exception as exc:
+                  raise SystemExit(f'Health check failed: {url}: {exc}')
+          PY

@@ -6,7 +6,7 @@ const {S3Client,GetObjectCommand,HeadObjectCommand}=require('@aws-sdk/client-s3'
 const {getSignedUrl}=require('@aws-sdk/s3-request-presigner');
 const env=process.env;
 const base=(env.APP_BASE_PATH||'/screenroom-api').replace(/\/$/,'');
-const origin=env.SITE_ORIGIN||'https://devrijonn.com';
+const origin=env.SITE_ORIGIN||'https://screenroom.devrijonn.com';
 const configured=['DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'].every(k=>!!env[k]);
 const authReady=configured&&env.ADMIN_USERNAME&&env.ADMIN_PASSWORD_HASH?.startsWith('$2')&&env.SESSION_SECRET?.length>=48;
 const r2Ready=['R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET'].every(k=>!!env[k]);
