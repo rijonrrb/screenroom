@@ -41,3 +41,6 @@ python scripts/deploy_ftps.py --mode screenroom-api --dry-run
 7. Set GitHub Actions production secrets above. From then on, tests must pass before automatic deployment. Actions will fail safely if credentials are missing.
 
 Note: Private R2 HLS still needs authenticated segment proxy. No unlicensed movie embed aggregators are bundled.
+
+### cPanel-managed Apache configuration
+The subdomain already has a provider-generated .htaccess containing PHP directives. Do not overwrite it during deployment. It must retain its original directives and include the following settings: Options -Indexes and DirectoryIndex index.html. The FTPS manifest explicitly excludes .htaccess.

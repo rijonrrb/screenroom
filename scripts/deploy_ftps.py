@@ -18,7 +18,7 @@ def manifest(mode):
         names += [p.relative_to(base).as_posix() for p in (base/'assets').rglob('*') if p.is_file()]
     elif mode == 'screenroom-web':
         base = ROOT/'watch'
-        names = [p.relative_to(base).as_posix() for p in base.rglob('*') if p.is_file()]
+        names = [p.relative_to(base).as_posix() for p in base.rglob('*') if p.is_file() and p.name != '.htaccess']
     else:
         base = ROOT/'screenroom-server'
         names = ['app.js','package.json','package-lock.json']
