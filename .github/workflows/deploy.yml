@@ -33,6 +33,7 @@ jobs:
       - name: Syntax and FTPS manifest checks
         run: |
           node --check screenroom-server/app.js
+          node --check screenroom-server/server.js
           node --check screenroom-server/studio/studio.js
           node --check watch/assets/screenroom.js
           python -m py_compile scripts/deploy_ftps.py
