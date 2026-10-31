@@ -78,7 +78,7 @@ async function mountStream(t,ep){
  try{
   const stream=await getAPI('/api/stream/'+encodeURIComponent(asset.id));
   if(!stream.url)throw new Error('No authorized playback URL returned.');
-  const module=await import('./vendor/securestream.js');
+  const module=await import('./vendor/securestream.js?v=0.2.0');
   const div=document.createElement('div');div.className='screenroom-video';
   box.replaceWith(div);
   new module.SecureStreamPlayer({
@@ -99,7 +99,7 @@ async function showTrailer(t){
  try{
   const stream=await getAPI('/api/stream/'+encodeURIComponent(asset.id));
   if(!stream.url)throw new Error('Trailer is not available.');
-  const module=await import('./vendor/securestream.js');
+  const module=await import('./vendor/securestream.js?v=0.2.0');
   dialog=document.createElement('dialog');dialog.className='sr-trailer-dialog';
   dialog.innerHTML='<div class="sr-trailer-head"><strong>OFFICIAL TRAILER</strong><button type="button" class="sr-trailer-close">CLOSE ✕</button></div><div class="sr-trailer-content"></div>';
   document.body.append(dialog);
