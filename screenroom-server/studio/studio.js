@@ -40,6 +40,13 @@ async function loadTitles(){
  $('published-count').textContent=titles.filter(x=>x.status==='published').length;
  $('draft-count').textContent=titles.filter(x=>x.status==='draft').length;
  const target=$('title-list');target.replaceChildren();
+ const targetSelect=$('tmdb-target');
+ const previousTarget=targetSelect.value;
+ targetSelect.replaceChildren(new Option('Create new / reuse exact TMDB match',''));
+ for(const title of titles.filter(item=>item.status==='draft')){
+  targetSelect.add(new Option('UPDATE DRAFT: '+title.title+' ('+title.kind.toUpperCase()+')',String(title.id)));
+ }
+ if(previousTarget && [...targetSelect.options].some(opt=>opt.value===previousTarget))targetSelect.value=previousTarget;
  if(!titles.length)target.innerHTML='<p class="muted">Nothing here yet. Create a draft or search TMDB.</p>';
  titles.forEach(t=>{
   const b=document.createElement('button');b.type='button';
@@ -106,20 +113,44 @@ $('tmdb-quick-search').addEventListener('click',()=>{
 $('tmdb-url-form').addEventListener('submit',e=>{e.preventDefault();attempt(async()=>{
  const url=e.target.elements.namedItem('tmdb_url').value.trim();
  const kind=$('tmdb-form').elements.namedItem('type').value;
- const d=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify({kind,tmdb_url:url})});
- notify('Imported metadata from TMDB URL.');await loadTitles();await loadEditor(d.id);
+ const target=$('tmdb-target').value;
+ const payload={kind,tmdb_url:url};if(target)payload.target_title_id=Number(target);
+ $('tmdb-feedback').textContent='Importing metadata from TMDB URL…';
+ const d=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify(payload)});
+ $('tmdb-feedback').textContent=d.created?'TMDB draft created.':'Existing title updated from TMDB.';
+ notify($('tmdb-feedback').textContent);await loadTitles();await loadEditor(d.id);
 });});
 $('tmdb-form').addEventListener('submit',e=>{e.preventDefault();attempt(async()=>{
  const form=jsonForm(e.target);
+ $('tmdb-feedback').textContent='Searching TMDB…';
  const d=await api('/api/admin/tmdb/search?type='+encodeURIComponent(form.type)+'&q='+encodeURIComponent(form.q));
+ $('tmdb-feedback').textContent=(d.results?.length||0)+' matching TMDB titles found. Choose the correct release/year.';
  const results=$('tmdb-results');results.replaceChildren();
  if(!d.results?.length){results.innerHTML='<p class="muted">No metadata found.</p>';return;}
  d.results.forEach(item=>{
   const b=document.createElement('button');b.className='tmdb-result';b.type='button';
   b.innerHTML='<span>'+escapeHTML(item.title)+' ('+escapeHTML(item.year)+')</span><span>IMPORT ↗</span>';
   b.addEventListener('click',()=>attempt(async()=>{
-   const x=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify({kind:form.type,tmdb_id:item.id})});
-   notify('TMDB metadata imported as draft.');await loadTitles();await loadEditor(x.id);
+   const selectedId=$('tmdb-target').value;
+   const prior=b.textContent;
+   const buttons=[...results.querySelectorAll('button')];buttons.forEach(button=>button.disabled=true);
+   b.textContent='IMPORTING METADATA…';
+   $('tmdb-feedback').textContent='Importing '+item.title+' from TMDB…';
+   try{
+    const payload={kind:form.type,tmdb_id:item.id};
+    if(selectedId)payload.target_title_id=Number(selectedId);
+    const x=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify(payload)});
+    $('tmdb-feedback').textContent=x.created?'New metadata draft created.':'Existing title metadata refreshed. No duplicate was created.';
+    notify($('tmdb-feedback').textContent);
+    await loadTitles();await loadEditor(x.id);
+   }catch(error){
+    $('tmdb-feedback').textContent=error.message||'TMDB import failed. Please retry.';
+    $('tmdb-feedback').scrollIntoView({block:'nearest'});
+    notify($('tmdb-feedback').textContent,false);
+   }finally{
+    buttons.forEach(button=>button.disabled=false);
+    b.textContent=prior;
+   }
   }));results.append(b);
  });
 });});
