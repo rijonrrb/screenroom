@@ -8,7 +8,12 @@ const env=process.env;
 const base=(env.APP_BASE_PATH||'/screenroom-api').replace(/\/$/,'');
 const origin=env.SITE_ORIGIN||'https://screenroom.devrijonn.com';
 const configured=['DB_HOST','DB_USER','DB_PASSWORD','DB_NAME'].every(k=>!!env[k]);
-const authReady=configured&&env.ADMIN_USERNAME&&env.ADMIN_PASSWORD_HASH?.startsWith('$2')&&env.SESSION_SECRET?.length>=48;
+// Avoid cPanel/Passenger interpolation of dollar signs inside bcrypt hashes.
+// Base64 encodes the full bcrypt hash for environment transport only.
+const adminPasswordHash=env.ADMIN_PASSWORD_HASH_B64
+ ?Buffer.from(env.ADMIN_PASSWORD_HASH_B64,'base64').toString('utf8')
+ :(env.ADMIN_PASSWORD_HASH||'');
+const authReady=Boolean(configured&&env.ADMIN_USERNAME&&/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(adminPasswordHash)&&env.SESSION_SECRET?.length>=48);
 const r2Ready=['R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET'].every(k=>!!env[k]);
 const db=configured?mysql.createPool({host:env.DB_HOST,port:Number(env.DB_PORT||3306),user:env.DB_USER,password:env.DB_PASSWORD,database:env.DB_NAME,waitForConnections:true,connectionLimit:5,timezone:'Z',charset:'utf8mb4'}):null;
 const s3=r2Ready?new S3Client({region:'auto',endpoint:'https://'+env.R2_ACCOUNT_ID+'.r2.cloudflarestorage.com',credentials:{accessKeyId:env.R2_ACCESS_KEY_ID,secretAccessKey:env.R2_SECRET_ACCESS_KEY}}):null;
@@ -72,7 +77,7 @@ r.use('/studio',express.static(path.join(__dirname,'studio'),{index:'index.html'
 r.post('/api/admin/login',checkOrigin,rateLimit({windowMs:900000,limit:8,standardHeaders:'draft-7',legacyHeaders:false}),wrap(async(req,res)=>{
  if(!authReady)err(503,'Admin login not configured.');
  const user=String(req.body?.username||''),pass=String(req.body?.password||'');
- if(pass.length>256||user!==env.ADMIN_USERNAME||!await bcrypt.compare(pass,env.ADMIN_PASSWORD_HASH))err(401,'Invalid credentials.');
+ if(pass.length>256||user!==env.ADMIN_USERNAME||!await bcrypt.compare(pass,adminPasswordHash))err(401,'Invalid credentials.');
  const token=crypto.randomBytes(32).toString('hex'),xsrf=crypto.randomBytes(32).toString('hex');
  await sql('DELETE FROM admin_sessions WHERE expires_at<UTC_TIMESTAMP()');
  await sql('INSERT INTO admin_sessions(token_hash,csrf_hash,expires_at) VALUES(?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 12 HOUR))',[hash(token),hash(xsrf)]);
