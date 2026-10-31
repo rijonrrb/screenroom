@@ -44,3 +44,7 @@ Note: Private R2 HLS still needs authenticated segment proxy. No unlicensed movi
 
 ### cPanel-managed Apache configuration
 The subdomain already has a provider-generated .htaccess containing PHP directives. Do not overwrite it during deployment. It must retain its original directives and include the following settings: Options -Indexes and DirectoryIndex index.html. The FTPS manifest explicitly excludes .htaccess.
+
+## SecureStream Player 0.2.0 integration (2026-11-01)
+
+SCREENROOM uses the pinned SecureStream 0.2.0 ES/CSS bundle from rijonrrb/SecureStream-Player. iPhone Safari/Chrome use Apple native video fullscreen, while other browsers use container fullscreen. The SCREENROOM desktop upload flow converts/remuxes MKV originals into playable MP4 before R2 upload; original unsupported MKV files are not played directly by browsers. Audio track switching depends on browser support, or alternate HLS audio tracks. Pages use versioned asset requests to avoid stale mobile JS/CSS. The backend and Studio auth/metadata code are unchanged by this release.
