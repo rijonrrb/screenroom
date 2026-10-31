@@ -2,7 +2,7 @@
 
 Node.js 22, Express and MariaDB backend for portfolio's SCREENROOM catalog and media management.
 
-Hosting configured: cPanel Node 22 production, app root `screenroom-api`, startup `app.js`, mounted at `https://screenroom.devrijonn.com/screenroom-api`.
+Hosting configured: cPanel Node 22 production, app root `screenroom-api`, startup `server.js`, mounted at `https://screenroom.devrijonn.com/screenroom-api`.
 
 **Deployment steps**: (1) Assign a dedicated DB user to `devrijon_screenroom`. (2) Import `schema.sql` using phpMyAdmin. (3) Upload contents of this directory to `/home/devrijon/screenroom-api` (outside public_html). (4) Set all secrets in cPanel Node.js environment, never Git. (5) Run npm install and restart. (6) Test `/health`, `/api/titles`, `/studio/` and R2 MP4 signed playback.
 

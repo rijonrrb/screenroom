@@ -21,7 +21,7 @@ def manifest(mode):
         names = [p.relative_to(base).as_posix() for p in base.rglob('*') if p.is_file() and p.name != '.htaccess']
     else:
         base = ROOT/'screenroom-server'
-        names = ['app.js','package.json','package-lock.json']
+        names = ['app.js','server.js','package.json','package-lock.json']
         names += [p.relative_to(base).as_posix() for p in (base/'studio').rglob('*') if p.is_file()]
     result = []
     for name in names:
