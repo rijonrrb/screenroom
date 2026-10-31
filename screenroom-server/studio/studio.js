@@ -6,12 +6,29 @@ const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const notify=(msg,good=true)=>{$('notice').textContent=msg;$('notice').style.borderColor=good?'#f5c518':'#ed7272';};
 const jsonForm=form=>Object.fromEntries(new FormData(form));
 async function api(route,options={}){
- const headers={'Accept':'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...options.headers};
- if(!['GET','HEAD'].includes(options.method||'GET')&&csrf)headers['X-SCREENROOM-CSRF']=csrf;
- const r=await fetch(base+route,{credentials:'same-origin',...options,headers});
- let data;try{data=await r.json();}catch{data={error:'Unexpected server response.'};}
- if(!r.ok)throw Error(data.error||'Request failed ('+r.status+').');
- return data;
+ const method=options.method||'GET',mutation=!['GET','HEAD'].includes(method);
+ async function send(){
+  const headers={'Accept':'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...options.headers};
+  if(mutation&&csrf)headers['X-SCREENROOM-CSRF']=csrf;
+  const r=await fetch(base+route,{credentials:'same-origin',...options,headers});
+  let data;try{data=await r.json();}catch{data={error:'Unexpected server response.'};}
+  return {r,data};
+ }
+ let result=await send();
+ if(mutation&&result.r.status===403&&result.data.error==='Invalid CSRF token.'){
+  // Another open tab may have rotated the per-session CSRF token; fetch and retry once.
+  const response=await fetch(base+'/api/admin/csrf',{credentials:'same-origin',headers:{Accept:'application/json'}});
+  if(response.ok){
+   const fresh=await response.json();
+   if(fresh.csrf){
+    csrf=fresh.csrf;
+    sessionStorage.setItem('screenroom_csrf',csrf);
+    result=await send();
+   }
+  }
+ }
+ if(!result.r.ok)throw Error(result.data.error||'Request failed ('+result.r.status+').');
+ return result.data;
 }
 async function attempt(fn){
  try{await fn();}catch(e){notify(e.message||'Unexpected error.',false);}
@@ -40,6 +57,13 @@ async function loadTitles(){
  $('published-count').textContent=titles.filter(x=>x.status==='published').length;
  $('draft-count').textContent=titles.filter(x=>x.status==='draft').length;
  const target=$('title-list');target.replaceChildren();
+ const targetSelect=$('tmdb-target');
+ const previousTarget=targetSelect.value;
+ targetSelect.replaceChildren(new Option('Create new / reuse exact TMDB match',''));
+ for(const title of titles.filter(item=>item.status==='draft')){
+  targetSelect.add(new Option('UPDATE DRAFT: '+title.title+' ('+title.kind.toUpperCase()+')',String(title.id)));
+ }
+ if(previousTarget && [...targetSelect.options].some(opt=>opt.value===previousTarget))targetSelect.value=previousTarget;
  if(!titles.length)target.innerHTML='<p class="muted">Nothing here yet. Create a draft or search TMDB.</p>';
  titles.forEach(t=>{
   const b=document.createElement('button');b.type='button';
@@ -106,20 +130,48 @@ $('tmdb-quick-search').addEventListener('click',()=>{
 $('tmdb-url-form').addEventListener('submit',e=>{e.preventDefault();attempt(async()=>{
  const url=e.target.elements.namedItem('tmdb_url').value.trim();
  const kind=$('tmdb-form').elements.namedItem('type').value;
- const d=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify({kind,tmdb_url:url})});
- notify('Imported metadata from TMDB URL.');await loadTitles();await loadEditor(d.id);
+ const target=$('tmdb-target').value;
+ const payload={kind,tmdb_url:url};if(target)payload.target_title_id=Number(target);
+ $('tmdb-feedback').textContent='Importing metadata from TMDB URL…';
+ let d;
+ try{d=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify(payload)});}
+ catch(error){$('tmdb-feedback').textContent=error.message||'TMDB URL import failed.';throw error;}
+ $('tmdb-feedback').textContent=d.created?'TMDB draft created.':'Existing title updated from TMDB.';
+ notify($('tmdb-feedback').textContent);await loadTitles();await loadEditor(d.id);
 });});
 $('tmdb-form').addEventListener('submit',e=>{e.preventDefault();attempt(async()=>{
  const form=jsonForm(e.target);
- const d=await api('/api/admin/tmdb/search?type='+encodeURIComponent(form.type)+'&q='+encodeURIComponent(form.q));
+ $('tmdb-feedback').textContent='Searching TMDB…';
+ let d;
+ try{d=await api('/api/admin/tmdb/search?type='+encodeURIComponent(form.type)+'&q='+encodeURIComponent(form.q));}
+ catch(error){$('tmdb-feedback').textContent=error.message||'TMDB search failed.';throw error;}
+ $('tmdb-feedback').textContent=(d.results?.length||0)+' matching TMDB titles found. Choose the correct release/year.';
  const results=$('tmdb-results');results.replaceChildren();
  if(!d.results?.length){results.innerHTML='<p class="muted">No metadata found.</p>';return;}
  d.results.forEach(item=>{
   const b=document.createElement('button');b.className='tmdb-result';b.type='button';
   b.innerHTML='<span>'+escapeHTML(item.title)+' ('+escapeHTML(item.year)+')</span><span>IMPORT ↗</span>';
   b.addEventListener('click',()=>attempt(async()=>{
-   const x=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify({kind:form.type,tmdb_id:item.id})});
-   notify('TMDB metadata imported as draft.');await loadTitles();await loadEditor(x.id);
+   const selectedId=$('tmdb-target').value;
+   const prior=b.textContent;
+   const buttons=[...results.querySelectorAll('button')];buttons.forEach(button=>button.disabled=true);
+   b.textContent='IMPORTING METADATA…';
+   $('tmdb-feedback').textContent='Importing '+item.title+' from TMDB…';
+   try{
+    const payload={kind:form.type,tmdb_id:item.id};
+    if(selectedId)payload.target_title_id=Number(selectedId);
+    const x=await api('/api/admin/tmdb/import',{method:'POST',body:JSON.stringify(payload)});
+    $('tmdb-feedback').textContent=x.created?'New metadata draft created.':'Existing title metadata refreshed. No duplicate was created.';
+    notify($('tmdb-feedback').textContent);
+    await loadTitles();await loadEditor(x.id);
+   }catch(error){
+    $('tmdb-feedback').textContent=error.message||'TMDB import failed. Please retry.';
+    $('tmdb-feedback').scrollIntoView({block:'nearest'});
+    notify($('tmdb-feedback').textContent,false);
+   }finally{
+    buttons.forEach(button=>button.disabled=false);
+    b.textContent=prior;
+   }
   }));results.append(b);
  });
 });});

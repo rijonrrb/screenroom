@@ -192,15 +192,52 @@ r.get('/api/admin/tmdb/search',wrap(async(req,res)=>{
 }));
 r.post('/api/admin/tmdb/import',wrap(async(req,res)=>{
  const kind=req.body?.kind;if(!['movie','series'].includes(kind))err(400,'Invalid kind.');
- const tid=req.body?.tmdb_url?tmdbId(req.body.tmdb_url,kind):num(req.body?.tmdb_id),d=await tmdb((kind==='series'?'tv':'movie')+'/'+tid,{language:'en-US'});
+ const tid=req.body?.tmdb_url?tmdbId(req.body.tmdb_url,kind):num(req.body?.tmdb_id);
+ const d=await tmdb((kind==='series'?'tv':'movie')+'/'+tid,{language:'en-US'});
  const name=str(d.title||d.name),key=slug(name)+'-'+tid;
- const result=await sql("INSERT INTO titles(slug,kind,tmdb_id,title,synopsis,release_year,genres,poster_url,backdrop_url,runtime_minutes,status) VALUES(?,?,?,?,?,?,?,?,?,?,'draft')",
- [key,kind,tid,name,d.overview||null,Number((d.release_date||d.first_air_date||'').slice(0,4))||null,
- JSON.stringify((d.genres||[]).map(x=>x.name)),d.poster_path?'https://image.tmdb.org/t/p/w780'+d.poster_path:null,
- d.backdrop_path?'https://image.tmdb.org/t/p/w1280'+d.backdrop_path:null,d.runtime||d.episode_run_time?.[0]||null]);
- if(kind==='series')for(const s of (d.seasons||[]).filter(x=>x.season_number>0).slice(0,30))
- await sql('INSERT INTO seasons(title_id,season_number,name,synopsis) VALUES(?,?,?,?)',[result.insertId,s.season_number,s.name||'Season '+s.season_number,s.overview||null]);
- res.status(201).json({id:result.insertId,slug:key});
+ const year=Number((d.release_date||d.first_air_date||'').slice(0,4))||null;
+ const genres=JSON.stringify((d.genres||[]).map(x=>x.name));
+ const poster=d.poster_path?'https://image.tmdb.org/t/p/w780'+d.poster_path:null;
+ const backdrop=d.backdrop_path?'https://image.tmdb.org/t/p/w1280'+d.backdrop_path:null;
+ const runtime=d.runtime||d.episode_run_time?.[0]||null;
+ const targetId=req.body?.target_title_id?num(req.body.target_title_id):null;
+ let existing=[];
+ if(targetId){
+  existing=await sql('SELECT id,slug,kind,tmdb_id,status FROM titles WHERE id=? LIMIT 1',[targetId]);
+  if(!existing.length)err(404,'Selected draft no longer exists. Refresh the catalog.');
+  const row=existing[0];
+  if(row.kind!==kind||row.status!=='draft')err(409,'Choose a draft of the same Movie/Series type.');
+  if(row.tmdb_id&&Number(row.tmdb_id)!==tid)err(409,'Selected draft is already linked to another TMDB title.');
+  const duplicate=await sql('SELECT id FROM titles WHERE kind=? AND tmdb_id=? AND id<>? LIMIT 1',[kind,tid,row.id]);
+  if(duplicate.length)err(409,'This TMDB title is already imported. Select its existing catalog entry.');
+ }else{
+  existing=await sql('SELECT id,slug,kind,tmdb_id,status FROM titles WHERE kind=? AND tmdb_id=? LIMIT 1',[kind,tid]);
+  if(!existing.length){
+   // Reuse a single exact-name legacy draft even if its year was omitted.
+   const candidates=await sql('SELECT id,slug,kind,tmdb_id,status FROM titles WHERE kind=? AND tmdb_id IS NULL AND LOWER(title)=LOWER(?) AND (release_year=? OR release_year IS NULL) AND status=? LIMIT 2',[kind,name,year,'draft']);
+   if(candidates.length===1)existing=candidates;
+  }
+ }
+ let id,created=false;
+ if(existing.length){
+  id=existing[0].id;
+  // Preserve its slug, publication status, linked media and existing season/episode rows.
+  await sql('UPDATE titles SET tmdb_id=?,title=?,synopsis=?,release_year=?,genres=?,poster_url=?,backdrop_url=?,runtime_minutes=? WHERE id=?',
+   [tid,name,d.overview||null,year,genres,poster,backdrop,runtime,id]);
+ }else{
+  const result=await sql("INSERT INTO titles(slug,kind,tmdb_id,title,synopsis,release_year,genres,poster_url,backdrop_url,runtime_minutes,status) VALUES(?,?,?,?,?,?,?,?,?,?,'draft')",
+   [key,kind,tid,name,d.overview||null,year,genres,poster,backdrop,runtime]);
+  id=result.insertId;created=true;
+ }
+ if(kind==='series'){
+  const seasons=await sql('SELECT season_number FROM seasons WHERE title_id=?',[id]);
+  const known=new Set(seasons.map(x=>Number(x.season_number)));
+  for(const season of (d.seasons||[]).filter(x=>x.season_number>0).slice(0,30)){
+   if(known.has(season.season_number))continue;
+   await sql('INSERT INTO seasons(title_id,season_number,name,synopsis) VALUES(?,?,?,?)',[id,season.season_number,season.name||'Season '+season.season_number,season.overview||null]);
+  }
+ }
+ res.status(created?201:200).json({id,slug:existing[0]?.slug||key,created,updated:!created});
 }));
 r.post('/api/admin/tmdb/import-episodes',wrap(async(req,res)=>{
  const sid=num(req.body?.season_id),rows=await sql("SELECT s.season_number,t.tmdb_id FROM seasons s JOIN titles t ON t.id=s.title_id WHERE s.id=? AND t.kind='series'",[sid]);
