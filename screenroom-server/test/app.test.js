@@ -39,6 +39,8 @@ test('external video provider allowlists and HTTPS reject unexpected hosts',()=>
  assert.throws(()=>mediaURL('https://archive.org.evil.example/video.mp4','internet_archive'));
  assert.throws(()=>mediaURL('https://archive.org/download/video.mp4','authorized_https'));
  assert.throws(()=>mediaURL('https://archive.org/download/video.html','internet_archive'));
+ assert.equal(mediaURL('https://archive.org/download/demo/original.mkv','internet_archive'),'https://archive.org/download/demo/original.mkv');
+ assert.equal(mediaURL('https://archive.org/download/demo/recording.mp3','internet_archive'),'https://archive.org/download/demo/recording.mp3');
 });
 test('admin UI includes TMDB and media provider workflows',async()=>{
  const server=app.listen(0);
@@ -52,5 +54,7 @@ test('admin UI includes TMDB and media provider workflows',async()=>{
   assert.match(html,/Wikimedia Commons/);
   assert.match(html,/NASA Video Library/);
   assert.match(html,/rights_confirmed/);
+  assert.match(html,/value="mkv"/);
+  assert.match(html,/value="mp3"/);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });

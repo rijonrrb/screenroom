@@ -48,3 +48,7 @@ The subdomain already has a provider-generated .htaccess containing PHP directiv
 ## SecureStream Player 0.2.0 integration (2026-11-01)
 
 SCREENROOM uses the pinned SecureStream 0.2.0 ES/CSS bundle from rijonrrb/SecureStream-Player. iPhone Safari/Chrome use Apple native video fullscreen, while other browsers use container fullscreen. The SCREENROOM desktop upload flow converts/remuxes MKV originals into playable MP4 before R2 upload; original unsupported MKV files are not played directly by browsers. Audio track switching depends on browser support, or alternate HLS audio tracks. Pages use versioned asset requests to avoid stale mobile JS/CSS. The backend and Studio auth/metadata code are unchanged by this release.
+
+## SecureStream 0.3 original-container deployment
+
+SCREENROOM uses version-pinned SecureStream 0.3.0. Keep `watch/assets/vendor/movi-element.js` adjacent to `securestream.js`; it is lazy-loaded only for original MKV/AVI/MOV/MKA/legacy containers. Signed R2 object URLs are passed through unchanged. Attach the original R2 key using the matching media format in Studio after the media_assets ENUM migration. Do not upload unsupported/licensed media without authorization. Standard MP4/HLS playback remains on native HTMLVideoElement/hls.js. The browser cannot guarantee that all codecs/profiles, particularly 4K 10-bit HEVC, decode with full fidelity on every device.

@@ -63,15 +63,23 @@ r.get('/api/titles',requiresDB,wrap(async(req,res)=>{
  res.json({data:rows.map(normalized),page});
 }));
 r.get('/api/titles/:slug',requiresDB,wrap(async(req,res)=>res.json(await details(req.params.slug))));
+const MEDIA_MIME={
+ mp4:'video/mp4',m4v:'video/mp4',mkv:'video/x-matroska',mka:'audio/x-matroska',
+ webm:'video/webm',mov:'video/quicktime',avi:'video/x-msvideo',flv:'video/x-flv',
+ ts:'video/mp2t',m2ts:'video/mp2t',mpg:'video/mpeg',mpeg:'video/mpeg',
+ mp3:'audio/mpeg',m4a:'audio/mp4',aac:'audio/aac',flac:'audio/flac',
+ wav:'audio/wav',ogg:'audio/ogg',ogv:'video/ogg',opus:'audio/ogg', '3gp':'video/3gpp',
+ hls:'application/vnd.apple.mpegurl'
+};
 r.get('/api/stream/:id',requiresDB,wrap(async(req,res)=>{
  const rows=await sql('SELECT a.format,a.r2_key,a.provider,a.source_url FROM media_assets a LEFT JOIN titles t ON t.id=a.title_id LEFT JOIN episodes e ON e.id=a.episode_id LEFT JOIN seasons s ON s.id=e.season_id LEFT JOIN titles t2 ON t2.id=s.title_id WHERE a.id=? AND COALESCE(t.status,t2.status)=? LIMIT 1',[num(req.params.id),'published']);
  if(!rows.length)err(404,'Media unavailable.');
  const asset=rows[0],provider=asset.provider||'r2';
  if(provider!=='r2')return res.json({url:mediaURL(asset.source_url,provider),expiresIn:0,format:asset.format,provider});
- if(asset.format!=='mp4')err(409,'Private R2 HLS requires an authenticated segment proxy.');
+ if(asset.format==='hls')err(409,'Private R2 HLS requires an authenticated segment proxy.');
  if(!s3)err(503,'R2 not configured.');
- const signed=await getSignedUrl(s3,new GetObjectCommand({Bucket:env.R2_BUCKET,Key:asset.r2_key}),{expiresIn:900});
- res.json({url:signed,expiresIn:900,format:'mp4',provider:'r2'});
+ const signed=await getSignedUrl(s3,new GetObjectCommand({Bucket:env.R2_BUCKET,Key:asset.r2_key}),{expiresIn:21600});
+ res.json({url:signed,expiresIn:21600,format:asset.format,provider:'r2'});
 }));
 r.use('/studio',express.static(path.join(__dirname,'studio'),{index:'index.html',dotfiles:'deny',maxAge:0}));
 r.post('/api/admin/login',checkOrigin,rateLimit({windowMs:900000,limit:8,standardHeaders:'draft-7',legacyHeaders:false}),wrap(async(req,res)=>{
@@ -147,7 +155,7 @@ function mediaURL(value,provider){
   authorized_https:(env.MEDIA_ALLOWED_HOSTS||'').split(',').map(h=>h.trim().toLowerCase()).filter(Boolean).includes(host)
  };
  if(!checks[provider])err(400,'Video host is not approved for the selected provider.');
- if(!/\.(mp4|m3u8)(?:$)/i.test(u.pathname))err(400,'A direct MP4 or HLS manifest URL is required.');
+ if(!/\.(mp4|m4v|mkv|mka|webm|mov|avi|flv|ts|m2ts|mpg|mpeg|mp3|m4a|aac|flac|wav|ogg|ogv|opus|3gp|m3u8)$/i.test(u.pathname))err(400,'A supported direct media URL is required.');
  return u.href;
 }
 function tmdbId(value,kind){
@@ -160,7 +168,7 @@ function tmdbId(value,kind){
  return num(m[2]);
 }
 r.post('/api/admin/assets',wrap(async(req,res)=>{
- const b=req.body||{};if(!['feature','episode','trailer'].includes(b.role)||!['mp4','hls'].includes(b.format))err(400,'Invalid role/format.');
+ const b=req.body||{};if(!['feature','episode','trailer'].includes(b.role)||!Object.hasOwn(MEDIA_MIME,b.format))err(400,'Invalid role/format.');
  const tid=b.title_id?num(b.title_id):null,eid=b.episode_id?num(b.episode_id):null;
  if(Number(!!tid)+Number(!!eid)!==1)err(400,'Select exactly one title or episode.');
  if((b.role==='feature'&&!tid)||(b.role==='episode'&&!eid))err(400,'Media owner mismatch.');
@@ -169,9 +177,13 @@ r.post('/api/admin/assets',wrap(async(req,res)=>{
  if(provider==='r2'&&b.format!=='mp4')err(400,'Private R2 HLS is not ready without a segment proxy.');
  const objectKey=provider==='r2'?mediaKey(b.r2_key):null;
  const sourceURL=provider==='r2'?null:mediaURL(b.source_url,provider);
- if(sourceURL&&((b.format==='hls')!==new URL(sourceURL).pathname.toLowerCase().endsWith('.m3u8')))err(400,'Selected format does not match the video URL.');
+ if(objectKey){
+  const ext=objectKey.toLowerCase().split('.').pop();
+  if(ext!==b.format)err(400,'R2 object key extension must match the chosen format.');
+ }
+ if(sourceURL){const ext=new URL(sourceURL).pathname.toLowerCase().split('.').pop();if((b.format==='hls'?ext!=='m3u8':ext!==b.format))err(400,'Selected format does not match the video URL.');}
  const result=await sql('INSERT INTO media_assets(title_id,episode_id,role,format,provider,r2_key,source_url,content_type) VALUES(?,?,?,?,?,?,?,?)',
- [tid,eid,b.role,b.format,provider,objectKey,sourceURL,b.format==='mp4'?'video/mp4':'application/vnd.apple.mpegurl']);
+ [tid,eid,b.role,b.format,provider,objectKey,sourceURL,MEDIA_MIME[b.format]]);
  res.status(201).json({id:result.insertId});
 }));
 r.post('/api/admin/assets/verify',wrap(async(req,res)=>{
