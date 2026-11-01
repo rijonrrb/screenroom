@@ -5,8 +5,6 @@ Independent SCREENROOM movie/series website and Express admin API. Its deploymen
 ## Live targets
 - Website: https://screenroom.devrijonn.com/
 - Backend / Studio: https://screenroom.devrijonn.com/screenroom-api/studio/
-- Backend health: https://screenroom.devrijonn.com/screenroom-api/health
-- Backend cPanel application root: /home/devrijon/screenroom-api (Node.js v22; startup server.js)
 - Website document root: /home/devrijon/screenroom.devrijonn.com
 
 The portfolio at https://devrijonn.com/ must **not** host SCREENROOM routes. Links labelled PORTFOLIO navigate to the portfolio domain, not a relative site path.
