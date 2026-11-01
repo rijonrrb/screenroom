@@ -27,9 +27,9 @@ search.addEventListener('input',render);
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>{const selected=x===b;x.classList.toggle('active',selected);x.setAttribute('aria-pressed',String(selected))});render()}));
 render();}
 function detail(t){if(!t){return '<div class="empty">This title is not available in the preview catalog. <a href="'+base+'">BACK TO CATALOG ↗</a></div>'}
-return '<div class="detail-hero"><div><p class="crumb"><a href="'+base+'">SCREENROOM</a> / '+(t.kind==='series'?'SERIES':'MOVIES')+' / '+escapeHtml(t.title.toUpperCase())+'</p><div class="eyebrow">AN ORIGINAL SCREENROOM PREVIEW</div><h1 class="detail-headline">'+escapeHtml(t.title.toUpperCase())+'<span class="dot">.</span></h1><div class="detail-info"><span class="pill key">'+(t.kind==='series'?'SERIES':'FILM')+'</span><span class="pill">'+t.year+'</span><span class="pill">'+escapeHtml(t.genre)+'</span><span class="pill">'+escapeHtml(t.rating)+'</span><span class="pill">'+escapeHtml(t.length)+'</span></div><p class="detail-description">'+escapeHtml(t.description)+'</p><div class="detail-actions"><a class="primary-btn" href="'+(t.kind==='series'&&t.seasons.length&&t.seasons[0].episodes.length?playHref(t,t.seasons[0].number,t.seasons[0].episodes[0].number):playHref(t))+'">▶ WATCH NOW</a><button class="ghost-btn" id="trailer-btn" type="button">TRAILER</button></div></div><div class="detail-art'+(t.backdrop_url?' has-backdrop':'')+'" data-mark="'+t.symbol+'" style="'+colors(t)+'">'+(t.backdrop_url?'<img class="detail-backdrop" src="'+escapeHtml(t.backdrop_url)+'" alt="">':'<span>VISUAL PLACEHOLDER / '+t.year+'</span>')+'</div></div><div class="notice-box">'+previewNotice+'</div>';}
+return '<div class="detail-hero"><div><p class="crumb"><a href="'+base+'">SCREENROOM</a> / '+(t.kind==='series'?'SERIES':'MOVIES')+' / '+escapeHtml(t.title.toUpperCase())+'</p><div class="eyebrow">AN ORIGINAL SCREENROOM PREVIEW</div><h1 class="detail-headline">'+escapeHtml(t.title.toUpperCase())+'<span class="dot">.</span></h1><div class="detail-info"><span class="pill key">'+(t.kind==='series'?'SERIES':'FILM')+'</span><span class="pill">'+t.year+'</span><span class="pill">'+escapeHtml(t.genre)+'</span>'+(t.rating?'<span class="pill">'+escapeHtml(t.rating)+'</span>':'')+(t.length?'<span class="pill">'+escapeHtml(t.length)+'</span>':'')+'</div><p class="detail-description">'+escapeHtml(t.description)+'</p><div class="detail-actions"><a class="primary-btn" href="'+(t.kind==='series'&&t.seasons.length&&t.seasons[0].episodes.length?playHref(t,t.seasons[0].number,t.seasons[0].episodes[0].number):playHref(t))+'">▶ WATCH NOW</a><button class="ghost-btn" id="trailer-btn" type="button">TRAILER</button></div></div><div class="detail-art'+(t.backdrop_url?' has-backdrop':'')+'" data-mark="'+t.symbol+'" style="'+colors(t)+'">'+(t.backdrop_url?'<img class="detail-backdrop" src="'+escapeHtml(t.backdrop_url)+'" alt="">':'<span>VISUAL PLACEHOLDER / '+t.year+'</span>')+'</div></div>'+(previewNotice?'<div class="notice-box">'+escapeHtml(previewNotice)+'</div>':'');}
 function renderDetail(){const t=getTitle(),target=q('#detail-content');if(!target)return;target.innerHTML=detail(t);q('#trailer-btn')?.addEventListener('click',()=>void showTrailer(t));if(t&&t.kind==='series'){const section=document.createElement('section');section.className='panel-section';section.innerHTML='<div class="season-row"><h2>EPISODES<span class="dot">.</span></h2><label><span class="sr-only">Choose season</span><select class="season-select" id="season-picker"></select></label></div><div class="episode-list" id="episode-list"></div>';target.append(section);const select=q('#season-picker');t.seasons.forEach(s=>select.add(new Option('SEASON '+s.number,s.number)));function episodes(){const season=t.seasons.find(s=>String(s.number)===select.value);q('#episode-list').innerHTML=season.episodes.map(e=>'<article class="episode"><div class="episode-image">'+(e.still_url?'<img class="episode-still" src="'+escapeHtml(e.still_url)+'" alt="" loading="lazy">':String(e.number).padStart(2,'0'))+'</div><div><h3>'+escapeHtml(e.title)+'</h3><p>'+escapeHtml(e.description)+'</p><small>S'+season.number+' E'+e.number+' / '+e.length+'</small></div><a class="episode-watch-btn" href="'+playHref(t,season.number,e.number)+'">WATCH NOW</a></article>').join('')}select.addEventListener('change',episodes);episodes()}}
-function renderPlay(){const t=getTitle(),target=q('#playback-content');if(!target)return;if(!t){target.innerHTML='<div class="empty">Invalid title. <a href="'+base+'">BACK TO CATALOG ↗</a></div>';return}const firstSeason=t.kind==='series'?t.seasons.find(s=>s.number===1)||t.seasons[0]:null;const firstEpisode=firstSeason?.episodes.find(e=>e.number===1)||firstSeason?.episodes[0];const season=params.get('season')??(firstSeason?String(firstSeason.number):null),episode=params.get('episode')??(firstEpisode?String(firstEpisode.number):null);const ep=t.kind==='series'?t.seasons.flatMap(s=>s.episodes.map(e=>({...e,season:s.number}))).find(e=>String(e.season)===season&&String(e.number)===episode):null;target.innerHTML='<p class="crumb"><a href="'+base+'">SCREENROOM</a> / <a href="'+titleHref(t)+'">'+escapeHtml(t.title.toUpperCase())+'</a> / PLAYBACK</p><h1 class="detail-headline">'+escapeHtml(t.title.toUpperCase())+'<span class="dot">.</span></h1>'+(ep?'<p class="eyebrow">SEASON '+ep.season+' / EPISODE '+ep.number+' — '+escapeHtml(ep.title)+'</p>':'')+'<div class="player-placeholder" role="status"><span class="eyebrow">SECURESTREAM INTEGRATION</span><strong>STREAM NOT CONNECTED</strong><p>For the live build, an authenticated API will verify the Cloudflare R2 object and return a browser-compatible playback URL to SecureStream Player.</p><a class="outline-link" href="'+titleHref(t)+'">← BACK TO DETAILS</a></div><div class="notice-box">'+previewNotice+'</div>';if(remoteMode)void mountStream(t,ep);}
+function renderPlay(){const t=getTitle(),target=q('#playback-content');if(!target)return;if(!t){target.innerHTML='<div class="empty">Invalid title. <a href="'+base+'">BACK TO CATALOG ↗</a></div>';return}const firstSeason=t.kind==='series'?t.seasons.find(s=>s.number===1)||t.seasons[0]:null;const firstEpisode=firstSeason?.episodes.find(e=>e.number===1)||firstSeason?.episodes[0];const season=params.get('season')??(firstSeason?String(firstSeason.number):null),episode=params.get('episode')??(firstEpisode?String(firstEpisode.number):null);const ep=t.kind==='series'?t.seasons.flatMap(s=>s.episodes.map(e=>({...e,season:s.number}))).find(e=>String(e.season)===season&&String(e.number)===episode):null;target.innerHTML='<p class="crumb"><a href="'+base+'">SCREENROOM</a> / <a href="'+titleHref(t)+'">'+escapeHtml(t.title.toUpperCase())+'</a> / PLAYBACK</p><h1 class="detail-headline">'+escapeHtml(t.title.toUpperCase())+'<span class="dot">.</span></h1>'+(ep?'<p class="eyebrow">SEASON '+ep.season+' / EPISODE '+ep.number+' — '+escapeHtml(ep.title)+'</p>':'')+'<div class="player-placeholder" role="status"><span class="eyebrow">SECURESTREAM INTEGRATION</span><strong>STREAM NOT CONNECTED</strong><p>For the live build, an authenticated API will verify the Cloudflare R2 object and return a browser-compatible playback URL to SecureStream Player.</p><a class="outline-link" href="'+titleHref(t)+'">← BACK TO DETAILS</a></div>'+(previewNotice?'<div class="notice-box">'+escapeHtml(previewNotice)+'</div>':'');if(remoteMode)void mountStream(t,ep);}
 let remoteMode=false;
 const API_BASE='https://screenroom.devrijonn.com/screenroom-api';
 const mins=n=>n?Math.floor(n/60)+'h '+String(n%60).padStart(2,'0')+'m':'';
@@ -39,7 +39,7 @@ function convertTitle(x){
   genre:(x.genres||[]).join(' / '),rating:'',length:x.kind==='series'?'Series':mins(x.runtime_minutes),
   description:x.synopsis||'No summary provided.',symbol:(x.title||'?').slice(0,1).toUpperCase(),
   colors:['#35414b','#111820'],poster_url:x.poster_url,backdrop_url:x.backdrop_url,
-  public_assets:x.public_assets||[],
+   public_assets:x.public_assets||[],trailer_url:x.trailer_url||null,
   seasons:(x.seasons||[]).map(se=>({number:se.season_number,name:se.name,episodes:(se.episodes||[]).map(ep=>({
    id:ep.id,number:ep.episode_number,title:ep.title,description:ep.synopsis||'',
    still_url:ep.still_url,length:mins(ep.runtime_minutes)
@@ -78,12 +78,13 @@ async function mountStream(t,ep){
  try{
   const stream=await getAPI('/api/stream/'+encodeURIComponent(asset.id));
   if(!stream.url)throw new Error('No authorized playback URL returned.');
-  const module=await import('./vendor/securestream.js?v=0.3.0');
+  const module=await import('./vendor/securestream.js?v=0.3.1');
   const div=document.createElement('div');div.className='screenroom-video';
   box.replaceWith(div);
   new module.SecureStreamPlayer({
    container:div,src:stream.url,id:'screenroom-'+t.id+(ep?'-'+ep.id:''),
-   title:t.title+(ep?' — '+ep.title:''),poster:t.backdrop_url||t.poster_url||undefined
+   title:t.title+(ep?' — '+ep.title:''),poster:t.backdrop_url||t.poster_url||undefined,
+    showWatermarkControl:false,preferOriginalMediaEngine:stream.format==='mp4'
   });
  }catch(error){
   const paragraph=box.querySelector('p');
@@ -93,13 +94,17 @@ async function mountStream(t,ep){
 
 
 async function showTrailer(t){
+ if(t?.trailer_url){
+  const link=new URL(t.trailer_url);
+  if(link.protocol==='https:'&&['www.youtube.com','youtube.com'].includes(link.hostname)){window.open(link.href,'_blank','noopener,noreferrer');return;}
+ }
  const asset=(t?.public_assets||[]).find(a=>a.role==='trailer'&&a.title_id);
  if(!remoteMode||!asset){alert('No trailer is linked for this title yet.');return;}
  let dialog;
  try{
   const stream=await getAPI('/api/stream/'+encodeURIComponent(asset.id));
   if(!stream.url)throw new Error('Trailer is not available.');
-  const module=await import('./vendor/securestream.js?v=0.3.0');
+  const module=await import('./vendor/securestream.js?v=0.3.1');
   dialog=document.createElement('dialog');dialog.className='sr-trailer-dialog';
   dialog.innerHTML='<div class="sr-trailer-head"><strong>OFFICIAL TRAILER</strong><button type="button" class="sr-trailer-close">CLOSE ✕</button></div><div class="sr-trailer-content"></div>';
   document.body.append(dialog);
@@ -109,8 +114,8 @@ async function showTrailer(t){
   new module.SecureStreamPlayer({
    container:dialog.querySelector('.sr-trailer-content'),src:stream.url,
    id:'screenroom-trailer-'+t.id,title:t.title+' · Trailer',
-   poster:t.backdrop_url||t.poster_url||undefined
-  });
+   poster:t.backdrop_url||t.poster_url||undefined,showWatermarkControl:false
+   });
  }catch(error){if(dialog?.open)dialog.close();alert('Trailer unavailable: '+error.message);}
 }
 

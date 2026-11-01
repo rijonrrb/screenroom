@@ -1,9 +1,13 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const base=location.pathname.includes('/studio')?location.pathname.split('/studio')[0]:'/screenroom-api';
-let csrf=sessionStorage.getItem('screenroom_csrf')||'',selected=null,titles=[];
+let csrf=sessionStorage.getItem('screenroom_csrf')||'',selected=null,titles=[],editingAssetId=null,toastTimer=null;
 const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const notify=(msg,good=true)=>{$('notice').textContent=msg;$('notice').style.borderColor=good?'#f5c518':'#ed7272';};
+const notify=(msg,good=true,autoHide=true)=>{
+ const notice=$('notice');clearTimeout(toastTimer);notice.textContent=msg;
+ notice.dataset.type=good?'success':'error';notice.hidden=false;
+ if(autoHide)toastTimer=setTimeout(()=>{notice.textContent='';notice.hidden=true;},3500);
+};
 const jsonForm=form=>Object.fromEntries(new FormData(form));
 async function api(route,options={}){
  const method=options.method||'GET',mutation=!['GET','HEAD'].includes(method);
@@ -31,7 +35,9 @@ async function api(route,options={}){
  return result.data;
 }
 async function attempt(fn){
- try{await fn();}catch(e){notify(e.message||'Unexpected error.',false);}
+ notify('Working…',true,false);
+ try{await fn();if($('notice').textContent==='Working…')notify('Completed successfully.');}
+ catch(e){notify(e.message||'Unexpected error.',false);}
 }
 function showDashboard(show){$('dashboard').hidden=!show;$('login-screen').hidden=show;$('logout').hidden=!show;}
 async function boot(){
@@ -65,18 +71,28 @@ async function loadTitles(){
  }
  if(previousTarget && [...targetSelect.options].some(opt=>opt.value===previousTarget))targetSelect.value=previousTarget;
  if(!titles.length)target.innerHTML='<p class="muted">Nothing here yet. Create a draft or search TMDB.</p>';
- titles.forEach(t=>{
-  const b=document.createElement('button');b.type='button';
+  titles.forEach(t=>{
+   const row=document.createElement('div');row.className='title-row';
+   const b=document.createElement('button');b.type='button';
   b.className='title-item'+(selected?.id===t.id?' active':'');
   b.innerHTML='<div><strong>'+escapeHTML(t.title)+'</strong><small>'+escapeHTML(t.kind.toUpperCase())+' • '+escapeHTML(t.slug)+'</small></div><em>'+escapeHTML(t.status)+'</em>';
-  b.addEventListener('click',()=>attempt(()=>loadEditor(t.id)));target.append(b);
+   b.addEventListener('click',()=>attempt(()=>loadEditor(t.id)));row.append(b);
+   const remove=document.createElement('button');remove.type='button';remove.className='outline title-remove';
+   remove.textContent='DELETE';remove.setAttribute('aria-label','Delete '+t.title);
+   remove.addEventListener('click',()=>attempt(async()=>{
+    if(!confirm('Permanently delete "'+t.title+'" from the catalog and remove its seasons and media links? The R2 source files will NOT be deleted.')){notify('Delete cancelled.');return;}
+    await api('/api/admin/titles/'+t.id,{method:'DELETE'});
+    if(selected?.id===t.id){selected=null;$('editor').hidden=true;resetAssetEditor();}
+    notify('Title deleted from catalog. R2 files were preserved.');await loadTitles();
+   }));
+   row.append(remove);target.append(row);
  });
 }
 async function loadEditor(id){
  selected=await api('/api/admin/titles/'+id);
  $('editor').hidden=false;$('editor-heading').textContent=selected.title.toUpperCase()+' / EDIT';
  const form=$('edit-form');
- for(const field of ['title','synopsis','poster_url','backdrop_url','release_year','status']){
+  for(const field of ['title','synopsis','poster_url','backdrop_url','trailer_url','release_year','status']){
   const input=form.elements.namedItem(field);if(input)input.value=selected[field]??'';
  }
  form.elements.namedItem('genres').value=(selected.genres||[]).join(', ');
@@ -99,12 +115,26 @@ async function loadEditor(id){
   seasons.append(section);
  }
  const assets=$('assets-list');assets.replaceChildren();
- (selected.assets||[]).forEach(a=>{const d=document.createElement('div');d.textContent=a.role+' / '+a.format+' / '+(a.provider||'r2')+' / '+(a.r2_key||a.source_url||'');assets.append(d);});
+  (selected.assets||[]).forEach(a=>{
+   const row=document.createElement('div');row.className='asset-entry';
+   const label=document.createElement('span');label.textContent=a.role+' / '+a.format+' / '+(a.provider||'r2')+' / '+(a.r2_key||a.source_url||'');
+   const edit=document.createElement('button');edit.className='outline';edit.type='button';edit.textContent='EDIT';
+   edit.addEventListener('click',()=>{editAsset(a);$('asset-form').scrollIntoView({behavior:'smooth',block:'center'});});
+   const remove=document.createElement('button');remove.className='outline';remove.type='button';remove.textContent='DELETE';
+   remove.addEventListener('click',()=>attempt(async()=>{
+    if(!confirm('Delete this media link from the catalog? The source file in R2 is preserved.')){notify('Delete cancelled.');return;}
+    await api('/api/admin/assets/'+a.id,{method:'DELETE'});
+    notify('Media link removed. R2 file preserved.');await loadEditor(selected.id);
+   }));
+   row.append(label,edit,remove);assets.append(row);
+  });
  $('asset-role').value=selected.kind==='movie'?'feature':'episode';
  $('asset-episode').disabled=selected.kind==='movie';
  $('source-search-title').value=selected.title;
- syncProvider();
- await loadTitles();
+  resetAssetEditor();
+  const primary=(selected.assets||[]).find(a=>a.role==='feature'&&selected.kind==='movie');
+  if(primary)editAsset(primary,true);
+  await loadTitles();
  $('editor').scrollIntoView({behavior:'smooth',block:'start'});
 }
 $('refresh').addEventListener('click',()=>attempt(loadTitles));
@@ -187,12 +217,32 @@ $('episode-form').addEventListener('submit',e=>{e.preventDefault();attempt(async
  e.target.reset();notify('Episode created.');await loadEditor(selected.id);
 });});
 const sourceNames={
- r2:'R2 requires a private MP4 object key. Keep R2 credentials in cPanel, not in the video URL.',
+  r2:'Enter the exact original R2 object key, e.g. movies/my-film.mkv (not a signed URL). Original bytes remain unchanged.',
  internet_archive:'Search Archive items, inspect the original file and its license before selecting. Some items are not licensed for reuse.',
  wikimedia_commons:'Only directly playable MP4 results are listed. Check the Commons file page for license and attribution.',
  nasa_library:'NASA has informational and educational footage, not a movie catalog. Check NASA media rules and third-party rights.',
  authorized_https:'Enter a direct MP4 or HLS URL on an approved domain in MEDIA_ALLOWED_HOSTS. Embeds/iframe URLs are not supported.'
 };
+function resetAssetEditor(){
+ editingAssetId=null;const form=$('asset-form');form.reset();
+ $('save-asset').textContent='ATTACH ASSET +';$('cancel-asset-edit').hidden=true;
+ form.elements.namedItem('role').value=selected?.kind==='series'?'episode':'feature';
+ $('asset-episode').disabled=selected?.kind!=='series';
+ syncProvider();
+}
+function editAsset(a,quiet=false){
+ editingAssetId=a.id;const form=$('asset-form');
+ form.elements.namedItem('provider').value=a.provider||'r2';
+ form.elements.namedItem('role').value=a.role;
+ form.elements.namedItem('episode_id').value=a.episode_id||'';
+ form.elements.namedItem('r2_key').value=a.r2_key||'';
+ form.elements.namedItem('source_url').value=a.source_url||'';
+ form.elements.namedItem('format').value=a.format;
+ syncProvider();$('asset-episode').disabled=a.role!=='episode';
+ $('save-asset').textContent='SAVE MEDIA CHANGES';$('cancel-asset-edit').hidden=false;
+ if(!quiet)notify('Existing media loaded. Update the key and format, then save.');
+}
+$('cancel-asset-edit').addEventListener('click',()=>{resetAssetEditor();notify('Media edit cancelled.');});
 function syncProvider(){
  const provider=$('asset-provider').value,isR2=provider==='r2';
  $('asset-r2-box').hidden=!isR2;$('asset-url-box').hidden=isR2;
@@ -200,7 +250,6 @@ function syncProvider(){
  $('source-search-form').hidden=!['internet_archive','wikimedia_commons','nasa_library'].includes(provider);
  $('asset-form').elements.namedItem('r2_key').required=isR2;
  $('asset-form').elements.namedItem('source_url').required=!isR2;
- if(isR2)$('asset-form').elements.namedItem('format').value='mp4';
  $('source-help').textContent=sourceNames[provider]||'';
  $('source-search-results').replaceChildren();
 }
@@ -241,14 +290,23 @@ $('asset-form').addEventListener('submit',e=>{e.preventDefault();attempt(async()
  else{delete b.r2_key;b.rights_confirmed=e.target.elements.namedItem('rights_confirmed').checked;}
  if(b.role==='episode'){if(!b.episode_id)throw Error('Choose an episode.');delete b.title_id;}
  else{b.title_id=selected.id;delete b.episode_id;}
- if(b.role==='episode')delete b.title_id;
- await api('/api/admin/assets',{method:'POST',body:JSON.stringify(b)});
- e.target.reset();syncProvider();notify('Media attached.');await loadEditor(selected.id);
+  if(b.role==='episode')delete b.title_id;
+  if(editingAssetId)b.replace_asset_id=editingAssetId;
+  const updated=Boolean(editingAssetId);
+  await api('/api/admin/assets',{method:'POST',body:JSON.stringify(b)});
+  resetAssetEditor();notify(updated?'Media replaced successfully. Watch Now will use the new source.':'Media attached.');
+  await loadEditor(selected.id);
 });});
 $('verify-asset').addEventListener('click',()=>attempt(async()=>{
  const key=$('asset-form').elements.namedItem('r2_key').value;
  const d=await api('/api/admin/assets/verify',{method:'POST',body:JSON.stringify({r2_key:key})});
  notify('R2 object verified. '+(d.bytes||0)+' bytes / '+(d.contentType||'Unknown MIME'));
 }));
+$('asset-form').elements.namedItem('r2_key').addEventListener('input',e=>{
+ if(e.target.value.trim())notify('Object key entered. Click VERIFY IN R2 to confirm availability.');
+});
+$('asset-form').elements.namedItem('r2_key').addEventListener('input',e=>{
+ if(e.target.value.trim())notify('Object key entered. Click VERIFY IN R2 to confirm availability.');
+});
 syncProvider();
 boot();

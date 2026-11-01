@@ -58,3 +58,12 @@ test('admin UI includes TMDB and media provider workflows',async()=>{
   assert.match(html,/value="mp3"/);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
+
+test('trailer links allow only HTTPS YouTube video destinations',()=>{
+ const {youtubeTrailerURL}=require('../app.js');
+ assert.equal(youtubeTrailerURL('https://youtu.be/dQw4w9WgXcQ'),'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+ assert.equal(youtubeTrailerURL('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30'),'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+ assert.equal(youtubeTrailerURL(''),null);
+ assert.throws(()=>youtubeTrailerURL('https://example.net/watch?v=dQw4w9WgXcQ'));
+ assert.throws(()=>youtubeTrailerURL('javascript:alert(1)'));
+});
