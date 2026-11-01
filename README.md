@@ -7,8 +7,6 @@ Independent SCREENROOM movie/series website and Express admin API. Its deploymen
 - Backend / Studio: https://screenroom.devrijonn.com/screenroom-api/studio/
 - Website document root: /home/devrijon/screenroom.devrijonn.com
 
-The portfolio at https://devrijonn.com/ must **not** host SCREENROOM routes. Links labelled PORTFOLIO navigate to the portfolio domain, not a relative site path.
-
 ## Code layout
 - watch/ - frontend, catalog, detail, series and player pages. **Contents** deploy to the website document root (not to a nested /watch path).
 - screenroom-server/ - Express + MariaDB API, Studio, tests and SQL migrations.
