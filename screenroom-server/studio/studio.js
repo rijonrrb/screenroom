@@ -66,11 +66,47 @@ async function loadTitles(){
  if(previousTarget && [...targetSelect.options].some(opt=>opt.value===previousTarget))targetSelect.value=previousTarget;
  if(!titles.length)target.innerHTML='<p class="muted">Nothing here yet. Create a draft or search TMDB.</p>';
  titles.forEach(t=>{
+  const row=document.createElement('div');row.className='title-row';
   const b=document.createElement('button');b.type='button';
   b.className='title-item'+(selected?.id===t.id?' active':'');
   b.innerHTML='<div><strong>'+escapeHTML(t.title)+'</strong><small>'+escapeHTML(t.kind.toUpperCase())+' • '+escapeHTML(t.slug)+'</small></div><em>'+escapeHTML(t.status)+'</em>';
-  b.addEventListener('click',()=>attempt(()=>loadEditor(t.id)));target.append(b);
+  b.addEventListener('click',()=>attempt(()=>loadEditor(t.id)));
+  const del=document.createElement('button');del.type='button';del.className='outline delete-title';
+  del.textContent='DELETE';del.title='Permanently delete this title and its database records';
+  del.setAttribute('aria-label','Delete '+t.title);
+  del.addEventListener('click',()=>attempt(()=>deleteTitle(t,del)));
+  row.append(b,del);target.append(row);
  });
+}
+async function deleteTitle(t,button){
+ const entered=window.prompt(
+  'Permanently delete "'+t.title+'"?\nType its exact title to continue:',
+  ''
+ );
+ if(entered===null)return;
+ if(entered!==t.title){
+  notify('Deletion cancelled: the exact title did not match.',false);
+  return;
+ }
+ const accepted=window.confirm(
+  'DELETE PERMANENTLY: '+t.title+' ('+t.kind.toUpperCase()+', '+t.status+')?\n\n'+
+  'The catalog entry, episodes, seasons and linked media records will be removed. '+
+  'Original Cloudflare R2 files will NOT be deleted. This database deletion cannot be undone.'
+ );
+ if(!accepted)return;
+ button.disabled=true;button.textContent='DELETING…';
+ try{
+  const result=await api('/api/admin/titles/'+encodeURIComponent(t.id)+'/permanent',{
+   method:'DELETE',body:JSON.stringify({confirm_title:t.title})
+  });
+  if(!result.deleted)throw Error('The server did not confirm the deletion.');
+  if(selected?.id===t.id){selected=null;$('editor').hidden=true;}
+  notify('Deleted "'+t.title+'" from Screenroom. R2 files remain unchanged.');
+  await loadTitles();
+ }catch(error){
+  notify(error.message||'Could not delete title.',false);
+  button.disabled=false;button.textContent='DELETE';
+ }
 }
 async function loadEditor(id){
  selected=await api('/api/admin/titles/'+id);
