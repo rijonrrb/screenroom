@@ -18,6 +18,11 @@ test('static admin and deliberate incomplete configuration are safe',async()=>{
   const html=await page.text();assert.match(html,/THE STUDIO/);assert.match(html,/ADMIN SIGN IN/);
   const js=await fetch(prefix+'/studio/studio.js');assert.equal(js.status,200);
   const unauthorized=await fetch(prefix+'/api/admin/titles');assert.equal(unauthorized.status,503);
+  const deleteAttempt=await fetch(prefix+'/api/admin/titles/3/permanent',{
+   method:'DELETE',headers:{'content-type':'application/json','origin':'https://screenroom.devrijonn.com'},
+   body:JSON.stringify({confirm_title:'Inception'})
+  });
+  assert.equal(deleteAttempt.status,503); // Authentication remains mandatory.
   const crossOrigin=await fetch(prefix+'/api/admin/login',{method:'POST',headers:{'content-type':'application/json','origin':'https://not-the-site.invalid'},body:JSON.stringify({username:'admin',password:'x'})});
   assert.equal(crossOrigin.status,403);
  }finally{await new Promise(resolve=>server.close(resolve));}
@@ -56,6 +61,7 @@ test('admin UI includes TMDB and media provider workflows',async()=>{
   assert.match(html,/rights_confirmed/);
   assert.match(html,/value="mkv"/);
   assert.match(html,/value="mp3"/);
+  assert.match(html,/href="https:\/\/screenroom\.devrijonn\.com\/"/);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
 

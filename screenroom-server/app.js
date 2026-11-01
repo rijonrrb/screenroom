@@ -127,8 +127,18 @@ r.patch('/api/admin/titles/:id',wrap(async(req,res)=>{
  const result=await sql('UPDATE titles SET '+updates.join(',')+' WHERE id=?',values);
  if(!result.affectedRows)err(404,'Title not found.');res.json({ok:true});
 }));
-r.delete('/api/admin/titles/:id',wrap(async(req,res)=>{
- const result=await sql('DELETE FROM titles WHERE id=?',[num(req.params.id)]);if(!result.affectedRows)err(404,'Title not found.');res.json({ok:true,deleted:true,r2ObjectsPreserved:true});
+// Explicit, strongly confirmed permanent delete. Database FKs cascade to seasons, episodes
+// and media asset records; original R2 objects are NOT removed from object storage.
+r.delete('/api/admin/titles/:id/permanent',wrap(async(req,res)=>{
+ const id=num(req.params.id);
+ const rows=await sql('SELECT id,title,slug FROM titles WHERE id=? LIMIT 1',[id]);
+ if(!rows.length)err(404,'Title not found.');
+ const title=rows[0];
+ if(typeof req.body?.confirm_title!=='string'||req.body.confirm_title!==title.title)
+  err(400,'Type the exact title to confirm permanent deletion.');
+ const deleted=await sql('DELETE FROM titles WHERE id=? AND title=?',[id,title.title]);
+ if(!deleted.affectedRows)err(409,'The title changed. Refresh and try again.');
+ res.json({ok:true,deleted:true,media_objects_preserved:true});
 }));
 r.post('/api/admin/seasons',wrap(async(req,res)=>{
  const b=req.body||{},titleId=num(b.title_id);
