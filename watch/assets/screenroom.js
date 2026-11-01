@@ -84,7 +84,7 @@ async function mountStream(t,ep){
   new module.SecureStreamPlayer({
    container:div,src:stream.url,id:'screenroom-'+t.id+(ep?'-'+ep.id:''),
    title:t.title+(ep?' — '+ep.title:''),poster:t.backdrop_url||t.poster_url||undefined,
-    showWatermarkControl:false,preferOriginalMediaEngine:stream.format==='mp4'
+    showWatermarkControl:false,preferOriginalMediaEngine:false
   });
  }catch(error){
   const paragraph=box.querySelector('p');
