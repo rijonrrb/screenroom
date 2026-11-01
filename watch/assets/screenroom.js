@@ -1,4 +1,4 @@
-/* SCREENROOM design preview: fictional metadata; no R2 URLs or external API credentials. */
+/* SCREENROOM frontend: catalog, title details, and playback integration. */
 let titles = [
 {id:'the-last-signal',kind:'movie',title:'The Last Signal',year:'2025',genre:'Sci-Fi / Mystery',rating:'PG-13',length:'1h 52m',description:'A distant transmission interrupts the quiet routine of a remote observatory, opening a mystery its team never intended to find.',symbol:'S',colors:['#3d4651','#111822'],episodes:[],seasons:[]},
 {id:'midnight-district',kind:'series',title:'Midnight District',year:'2024',genre:'Crime / Drama',rating:'TV-14',length:'1 Season',description:'When a city stops sleeping, a journalist follows threads that reveal more than an ordinary headline.',symbol:'M',colors:['#403728','#18120e'],seasons:[{number:1,name:'Season One',episodes:[{number:1,title:'After Hours',description:'A call made just before midnight leads to an unfamiliar address.',length:'42 min'},{number:2,title:'Unlisted',description:'A recovered recording alters the direction of the investigation.',length:'46 min'},{number:3,title:'The Crossing',description:'New evidence connects two stories thought unrelated.',length:'44 min'}]}]},
@@ -64,7 +64,7 @@ async function hydrateData(){
    titles=[convertTitle(data)];
   }
   remoteMode=true;
-  previewNotice='Catalog data is managed through SCREENROOM Studio. Playback requires a published, authorized R2 or approved HTTPS media source.';
+  previewNotice='';
  }catch(e){titles=[];remoteMode=false;previewNotice='SCREENROOM catalog is temporarily unavailable. Please try again later.';console.warn('SCREENROOM: backend not ready.');}
 }
 async function mountStream(t,ep){
