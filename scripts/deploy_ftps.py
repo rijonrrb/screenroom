@@ -3,6 +3,7 @@
 import argparse
 import ftplib
 import io
+import hashlib
 import os
 from pathlib import Path
 import ssl
@@ -72,6 +73,20 @@ def run():
             with local.open('rb') as stream:
                 ftp.storbinary('STOR '+path+'/'+parts[-1],stream)
             print('Uploaded:',name)
+        critical_names = {
+            'portfolio': {'index.html', 'assets/css/style.css', 'assets/js/script.js'},
+            'screenroom-web': {'index.html', 'assets/screenroom.js', 'assets/screenroom.css'},
+            'screenroom-api': {'app.js', 'package.json', 'studio/index.html'},
+        }
+        for name, local in files:
+            if name not in critical_names[args.mode]:
+                continue
+            expected = hashlib.sha256(local.read_bytes()).digest()
+            remote_hash = hashlib.sha256()
+            ftp.retrbinary('RETR ' + root + '/' + name, remote_hash.update)
+            if remote_hash.digest() != expected:
+                raise RuntimeError('FTPS read-back digest mismatch: ' + name)
+            print('Verified remote checksum:', name)
         if args.mode=='screenroom-api':
             tmp=root+'/tmp'
             try:ftp.mkd(tmp)
