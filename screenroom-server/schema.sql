@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS media_assets (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title_id BIGINT UNSIGNED NULL,episode_id BIGINT UNSIGNED NULL,
- role ENUM('feature','episode','trailer') NOT NULL,format ENUM('mp4','hls') NOT NULL,
+ role ENUM('feature','episode','trailer') NOT NULL,format ENUM('mp4','hls','mkv','mka','m4v','webm','mov','avi','flv','ts','m2ts','mpg','mpeg','mp3','m4a','aac','flac','wav','ogg','ogv','opus','3gp') NOT NULL,
  provider ENUM('r2','internet_archive','wikimedia_commons','nasa_library','authorized_https') NOT NULL DEFAULT 'r2',
  r2_key VARCHAR(1000) NULL,source_url VARCHAR(2000) NULL,content_type VARCHAR(120) NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
