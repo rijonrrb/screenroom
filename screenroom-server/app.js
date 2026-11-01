@@ -49,7 +49,7 @@ async function details(slugId,drafts=false){
  const t=normalized(rows[0]);delete t.created_at;delete t.updated_at;
  if(t.kind==='series'){t.seasons=await sql('SELECT id,season_number,name,synopsis FROM seasons WHERE title_id=? ORDER BY season_number',[t.id]);
  for(const season of t.seasons)season.episodes=await sql('SELECT id,episode_number,title,synopsis,still_url,runtime_minutes FROM episodes WHERE season_id=? ORDER BY episode_number',[season.id]);}
- t.public_assets=await sql('SELECT id,title_id,episode_id,role,format,provider FROM media_assets WHERE title_id=? OR episode_id IN (SELECT e.id FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.title_id=?)',[t.id,t.id]);
+ t.public_assets=await sql('SELECT id,title_id,episode_id,role,format,provider FROM media_assets WHERE title_id=? OR episode_id IN (SELECT e.id FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.title_id=?) ORDER BY id DESC',[t.id,t.id]);
  return t;
 }
 r.get('/health',wrap(async(req,res)=>{if(!configured) return res.status(503).json({ok:false,stage:'database-configuration-required'});await sql('SELECT 1');res.json({ok:true,service:'SCREENROOM'});}));
@@ -100,7 +100,7 @@ r.get('/api/admin/titles',wrap(async(req,res)=>res.json({data:await sql('SELECT 
 r.get('/api/admin/titles/:id',wrap(async(req,res)=>{
  const x=await sql('SELECT slug FROM titles WHERE id=?',[num(req.params.id)]);if(!x.length)err(404,'Title not found.');
  const t=await details(x[0].slug,true);
- t.assets=await sql('SELECT id,title_id,episode_id,role,format,provider,source_url,r2_key FROM media_assets WHERE title_id=? OR episode_id IN (SELECT e.id FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.title_id=?)',[t.id,t.id]);
+ t.assets=await sql('SELECT id,title_id,episode_id,role,format,provider,source_url,r2_key FROM media_assets WHERE title_id=? OR episode_id IN (SELECT e.id FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.title_id=?) ORDER BY id DESC',[t.id,t.id]);
  res.json(t);
 }));
 r.post('/api/admin/titles',wrap(async(req,res)=>{
@@ -112,7 +112,7 @@ r.post('/api/admin/titles',wrap(async(req,res)=>{
 }));
 r.patch('/api/admin/titles/:id',wrap(async(req,res)=>{
  const b=req.body||{},allowed={
- title:str,synopsis:opt,release_year:v=>v==null?null:num(v,2200),
+ title:str,synopsis:opt,trailer_url:youtubeTrailerURL,release_year:v=>v==null?null:num(v,2200),
  genres:list,poster_url:url,backdrop_url:url,runtime_minutes:v=>v==null?null:num(v,10000),
  status:v=>['draft','published','archived'].includes(v)?v:err(400,'Invalid status.')
  };
@@ -140,22 +140,6 @@ r.delete('/api/admin/titles/:id/permanent',wrap(async(req,res)=>{
  if(!deleted.affectedRows)err(409,'The title changed. Refresh and try again.');
  res.json({ok:true,deleted:true,media_objects_preserved:true});
 }));
-// Explicit, strongly confirmed permanent delete. Database FKs cascade to seasons, episodes
-// and media asset records; original R2 objects are NOT removed from object storage.
-r.delete('/api/admin/titles/:id/permanent',wrap(async(req,res)=>{
- const id=num(req.params.id);
- const rows=await sql('SELECT id,title,slug FROM titles WHERE id=? LIMIT 1',[id]);
- if(!rows.length)err(404,'Title not found.');
- const title=rows[0];
- if(typeof req.body?.confirm_title!=='string'||req.body.confirm_title!==title.title)
-  err(400,'Type the exact title to confirm permanent deletion.');
- const deleted=await sql('DELETE FROM titles WHERE id=? AND title=?',[id,title.title]);
- if(!deleted.affectedRows)err(409,'The title changed. Refresh and try again.');
- res.json({ok:true,deleted:true,media_objects_preserved:true});
-}));
-r.delete('/api/admin/titles/:id',wrap(async(req,res)=>{
- const result=await sql("UPDATE titles SET status='archived' WHERE id=?",[num(req.params.id)]);if(!result.affectedRows)err(404,'Title not found.');res.json({ok:true,archived:true});
-}));
 r.post('/api/admin/seasons',wrap(async(req,res)=>{
  const b=req.body||{},titleId=num(b.title_id);
  const rows=await sql("SELECT id FROM titles WHERE id=? AND kind='series'",[titleId]);if(!rows.length)err(400,'Series not found.');
@@ -167,6 +151,15 @@ r.post('/api/admin/episodes',wrap(async(req,res)=>{
  [num(b.season_id),num(b.episode_number,1000),str(b.title),opt(b.synopsis),url(b.still_url),b.runtime_minutes?num(b.runtime_minutes,10000):null]);
  res.status(201).json({id:result.insertId});
 }));
+function youtubeTrailerURL(v){
+ if(v==null||v==='')return null;
+ let u;try{u=new URL(str(v,500));}catch{err(400,'Enter a valid YouTube trailer URL.');}
+ if(u.protocol!=='https:'||u.username||u.password||u.port||u.hash)err(400,'Use a standard HTTPS YouTube link.');
+ const host=u.hostname.toLowerCase().replace(/^www\./,'');
+ const vid=host==='youtu.be'?u.pathname.slice(1):host==='youtube.com'&&u.pathname==='/watch'?u.searchParams.get('v'):host==='youtube.com'&&u.pathname.startsWith('/shorts/')?u.pathname.split('/')[2]:null;
+ if(!/^[a-zA-Z0-9_-]{11}$/.test(vid||''))err(400,'Use a YouTube video link with a valid video ID.');
+ return 'https://www.youtube.com/watch?v='+vid;
+}
 function mediaKey(v){const key=str(v,1000);if(key.startsWith('/')||key.includes('..')||key.includes('\\')||key.includes('?')||key.includes('://'))err(400,'Use an R2 object key, not a URL.');return key;}
 const providers=['r2','internet_archive','wikimedia_commons','nasa_library','authorized_https'];
 function mediaURL(value,provider){
@@ -200,7 +193,7 @@ r.post('/api/admin/assets',wrap(async(req,res)=>{
  if((b.role==='feature'&&!tid)||(b.role==='episode'&&!eid))err(400,'Media owner mismatch.');
  const provider=b.provider||'r2';if(!providers.includes(provider))err(400,'Unsupported video provider.');
  if(provider!=='r2'&&b.rights_confirmed!==true)err(400,'Confirm that you are authorized to stream this video.');
- if(provider==='r2'&&b.format!=='mp4')err(400,'Private R2 HLS is not ready without a segment proxy.');
+ if(provider==='r2'&&b.format==='hls')err(400,'Private R2 HLS is not ready without a segment proxy.');
  const objectKey=provider==='r2'?mediaKey(b.r2_key):null;
  const sourceURL=provider==='r2'?null:mediaURL(b.source_url,provider);
  if(objectKey){
@@ -208,9 +201,20 @@ r.post('/api/admin/assets',wrap(async(req,res)=>{
   if(ext!==b.format)err(400,'R2 object key extension must match the chosen format.');
  }
  if(sourceURL){const ext=new URL(sourceURL).pathname.toLowerCase().split('.').pop();if((b.format==='hls'?ext!=='m3u8':ext!==b.format))err(400,'Selected format does not match the video URL.');}
+ if(b.replace_asset_id){
+  const id=num(b.replace_asset_id),existing=await sql('SELECT id,title_id,episode_id FROM media_assets WHERE id=?',[id]);
+  if(!existing.length||(existing[0].title_id==null?null:Number(existing[0].title_id))!==tid||(existing[0].episode_id==null?null:Number(existing[0].episode_id))!==eid)err(404,'Existing media asset not found for this title or episode.');
+  await sql('UPDATE media_assets SET role=?,format=?,provider=?,r2_key=?,source_url=?,content_type=? WHERE id=?',[b.role,b.format,provider,objectKey,sourceURL,MEDIA_MIME[b.format],id]);
+  return res.json({id,updated:true});
+ }
  const result=await sql('INSERT INTO media_assets(title_id,episode_id,role,format,provider,r2_key,source_url,content_type) VALUES(?,?,?,?,?,?,?,?)',
  [tid,eid,b.role,b.format,provider,objectKey,sourceURL,MEDIA_MIME[b.format]]);
  res.status(201).json({id:result.insertId});
+}));
+r.delete('/api/admin/assets/:id',wrap(async(req,res)=>{
+ const result=await sql('DELETE FROM media_assets WHERE id=?',[num(req.params.id)]);
+ if(!result.affectedRows)err(404,'Media asset not found.');
+ res.json({ok:true,deleted:true,r2ObjectsPreserved:true});
 }));
 r.post('/api/admin/assets/verify',wrap(async(req,res)=>{
  if(!s3)err(503,'R2 not configured.');const head=await s3.send(new HeadObjectCommand({Bucket:env.R2_BUCKET,Key:mediaKey(req.body?.r2_key)}));
@@ -342,4 +346,4 @@ app.use((e,req,res,next)=>{
  res.status(status).json({error:status>=500?'Service temporarily unavailable.':e.message});
 });
 if(require.main===module)app.listen(Number(env.PORT||3000),()=>console.log('SCREENROOM API ready'));
-module.exports={app,slug,tmdbId,mediaURL};
+module.exports={app,slug,tmdbId,mediaURL,youtubeTrailerURL};

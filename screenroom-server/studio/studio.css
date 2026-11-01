@@ -10,3 +10,5 @@
 .title-row .delete-title:hover,.title-row .delete-title:focus-visible{border-color:#ed7272;color:#fff;background:#512222}
 .title-row .delete-title:disabled{opacity:.5;cursor:wait}
 @media(max-width:600px){.title-row .delete-title{min-width:62px;padding:10px 8px}}
+
+.asset-entry{display:flex;align-items:center;gap:8px;border:1px solid #333;padding:10px;margin:8px 0}.asset-entry span{flex:1;min-width:0;overflow-wrap:anywhere}.asset-entry button{font-size:10px;padding:9px}#notice:not(:empty){position:fixed;z-index:1000;right:24px;top:84px;max-width:min(420px,calc(100vw - 32px));border-left-color:var(--yellow);box-shadow:0 12px 32px #000b}#notice[data-type="error"]{border-left-color:#ed7272}@media(max-width:600px){#notice:not(:empty){top:68px;right:16px}.asset-entry{flex-wrap:wrap}.asset-entry span{flex-basis:100%}}

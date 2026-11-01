@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS titles (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, slug VARCHAR(160) NOT NULL UNIQUE,
  kind ENUM('movie','series') NOT NULL,tmdb_id BIGINT UNSIGNED NULL,
- title VARCHAR(250) NOT NULL,synopsis TEXT NULL,release_year SMALLINT UNSIGNED NULL,
+ title VARCHAR(250) NOT NULL,synopsis TEXT NULL,trailer_url VARCHAR(500) NULL,release_year SMALLINT UNSIGNED NULL,
  genres JSON NULL,poster_url VARCHAR(1400) NULL,backdrop_url VARCHAR(1400) NULL,
  runtime_minutes SMALLINT UNSIGNED NULL,
  status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
