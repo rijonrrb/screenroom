@@ -63,11 +63,33 @@ jobs:
       - name: Confirm frontend and API are reachable
         run: |
           python - <<'PY'
+          import json
+          import time
+          import urllib.error
           import urllib.request
-          for url in ('https://screenroom.devrijonn.com/', 'https://screenroom.devrijonn.com/screenroom-api/health'):
-              try:
-                  with urllib.request.urlopen(url, timeout=15) as res:
-                      print(url, res.status)
-              except Exception as exc:
-                  raise SystemExit(f'Health check failed: {url}: {exc}')
+
+          # Some hosting firewalls close connections from GitHub-hosted runners.
+          # FTP read-back checks above are mandatory; network-only errors are warnings.
+          targets = [('https://screenroom.devrijonn.com/', 'html'), ('https://screenroom.devrijonn.com/screenroom-api/health', 'json')]
+          for url, kind in targets:
+              for attempt in range(3):
+                  try:
+                      request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; ScreenroomDeployHealth/1.0)'})
+                      with urllib.request.urlopen(request, timeout=15) as response:
+                          if response.status != 200:
+                              raise SystemExit(f'Health check HTTP {response.status}: {url}')
+                          body = response.read(8192)
+                          if kind == 'html' and b'<html' not in body.lower():
+                              raise SystemExit(f'Unexpected HTML response: {url}')
+                          if kind == 'json' and json.loads(body).get('ok') is not True:
+                              raise SystemExit(f'Unhealthy JSON response: {url}')
+                          print(f'Live health check passed: {url}')
+                      break
+                  except urllib.error.HTTPError as exc:
+                      raise SystemExit(f'Health check HTTP {exc.code}: {url}')
+                  except (urllib.error.URLError, OSError) as exc:
+                      if attempt < 2:
+                          time.sleep(3)
+                          continue
+                      print(f'::warning::GitHub runner cannot reach {url} ({type(exc).__name__}); remote files verified via FTPS checksum. Check site from an independent network.')
           PY
