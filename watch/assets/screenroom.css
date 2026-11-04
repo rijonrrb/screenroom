@@ -85,3 +85,7 @@
 @media(hover:none) {
  .media-card:active,.sr-related-card:active,.sr-episode-card:active { border-color:var(--yellow); filter:brightness(1.07); }
 }
+
+/* Watch carousel art never crops source frames. Intrinsic sizing also handles poster-only entries. */
+.sr-watch-carousel .sr-watch-thumb.sr-has-image { aspect-ratio:auto; display:block; }
+.sr-watch-carousel .sr-watch-thumb.sr-has-image img { width:100%; height:auto; display:block; object-fit:contain; }

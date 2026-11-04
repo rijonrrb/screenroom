@@ -94,7 +94,7 @@ function renderPlay(){
 }
 function renderEpisodeExtras(t,episodes,active,toEpisode,previous,next){
   const cards=episodes.map((e,i)=>'<a class="sr-episode-card" href="'+toEpisode(e)+'"'+(i===active?' aria-current="page"':'')+'>'
-    +'<div class="sr-watch-thumb">'+(e.still_url?'<img src="'+escapeHtml(e.still_url)+'" alt="" loading="lazy">':'')
+    +'<div class="sr-watch-thumb'+(e.still_url?' sr-has-image':'')+'">'+(e.still_url?'<img src="'+escapeHtml(e.still_url)+'" alt="" loading="lazy">':'')
     +'<span class="sr-watch-number">S'+escapeHtml(e.season)+' E'+escapeHtml(e.number)+'</span></div>'
     +'<div class="sr-watch-info"><strong>'+escapeHtml(e.title)+'</strong><small>'+(e.length?escapeHtml(e.length)+' · ':'')+(i===active?'NOW PLAYING':'WATCH EPISODE')+'</small></div></a>').join('');
   return '<section class="sr-watch-extras" aria-label="Series episodes">'
@@ -140,7 +140,7 @@ async function renderRelatedMovies(current){
     .sort((a,b)=>b.match-a.match||a.shuffle-b.shuffle).slice(0,14);
   if(!ranked.length){box.innerHTML='<p class="sr-watch-empty">More movies will appear here as the catalog grows.</p>';return;}
   box.innerHTML=ranked.map(t=>'<a class="sr-related-card" href="'+titleHref(t)+'" aria-label="View '+escapeHtml(t.title)+' details">'
-    +'<div class="sr-watch-thumb">'+(t.poster_url?'<img src="'+escapeHtml(t.poster_url)+'" alt="" loading="lazy">':'')
+    +'<div class="sr-watch-thumb'+(t.backdrop_url||t.poster_url?' sr-has-image':'')+'">'+(t.backdrop_url||t.poster_url?'<img src="'+escapeHtml(t.backdrop_url||t.poster_url)+'" alt="" loading="lazy">':'')
     +'<span class="sr-watch-number">'+(t.match?'MATCHING GENRE':'DISCOVER')+'</span></div>'
     +'<div class="sr-watch-info"><strong>'+escapeHtml(t.title)+'</strong><small>'+escapeHtml(t.genre||'MOVIE')+'</small></div></a>').join('');
 }
