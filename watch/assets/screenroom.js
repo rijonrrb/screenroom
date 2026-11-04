@@ -38,14 +38,18 @@ function applyCardTilt(grid){
        const r=card.getBoundingClientRect();
        const x=Math.max(0,Math.min(1,(event.clientX-r.left)/r.width));
        const y=Math.max(0,Math.min(1,(event.clientY-r.top)/r.height));
-       card.style.setProperty('--tilt-x',((.5-y)*3.2).toFixed(2)+'deg');
-       card.style.setProperty('--tilt-y',((x-.5)*3.2).toFixed(2)+'deg');
+       card.style.setProperty('--tilt-x',((.5-y)*7).toFixed(2)+'deg');
+       card.style.setProperty('--spot-x',(x*100).toFixed(0)+'%');
+       card.style.setProperty('--spot-y',(y*100).toFixed(0)+'%');
+       card.style.setProperty('--tilt-y',((x-.5)*7).toFixed(2)+'deg');
      });
    });
    card.addEventListener('pointerleave',()=>{
      if(frame){cancelAnimationFrame(frame);frame=0;}
      card.style.removeProperty('--tilt-x');
      card.style.removeProperty('--tilt-y');
+     card.style.removeProperty('--spot-x');
+     card.style.removeProperty('--spot-y');
    });
  });
 }
@@ -192,7 +196,7 @@ async function mountStream(t,ep,episodeControls={}){
  try{
   const stream=await getAPI('/api/stream/'+encodeURIComponent(asset.id));
   if(!stream.url)throw new Error('No authorized playback URL returned.');
-  const module=await import('./vendor/securestream.js?v=0.3.4');
+  const module=await import('./vendor/securestream.js?v=0.3.5');
   const div=document.createElement('div');div.className='screenroom-video';
   box.replaceWith(div);
   // Apple mobile browsers need native MP4 media for system fullscreen/PiP.
@@ -224,7 +228,7 @@ async function showTrailer(t){
  try{
   const stream=await getAPI('/api/stream/'+encodeURIComponent(asset.id));
   if(!stream.url)throw new Error('Trailer is not available.');
-  const module=await import('./vendor/securestream.js?v=0.3.4');
+  const module=await import('./vendor/securestream.js?v=0.3.5');
   dialog=document.createElement('dialog');dialog.className='sr-trailer-dialog';
   dialog.innerHTML='<div class="sr-trailer-head"><strong>OFFICIAL TRAILER</strong><button type="button" class="sr-trailer-close">CLOSE ✕</button></div><div class="sr-trailer-content"></div>';
   document.body.append(dialog);
