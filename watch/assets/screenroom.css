@@ -21,3 +21,67 @@
 
 /* Modal for optional authorized R2 trailers. */
 .sr-trailer-dialog{background:#0b0b0b;color:#fff;border:1px solid #444;padding:16px;width:min(1000px,94vw);max-height:92vh}.sr-trailer-dialog::backdrop{background:#000e}.sr-trailer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:16px;font:11px "JetBrains Mono",monospace}.sr-trailer-close{color:#0a0a0a;background:#f5c518;border:0;padding:10px 14px;font:inherit;cursor:pointer}.sr-trailer-content{width:100%;aspect-ratio:16/9}
+
+/* Watch page: the media stage owns the aspect ratio, never an outer min-height. */
+#playback-content { min-width:0; }
+#playback-content .screenroom-video { width:100%; max-width:1100px; margin:26px auto 0; aspect-ratio:auto; }
+#playback-content .screenroom-video .ssp-player { width:100%; height:auto; min-height:0; }
+#playback-content .screenroom-video .ssp-stage { aspect-ratio:16/9; height:auto; }
+.sr-watch-extras { margin-top:28px; min-width:0; }
+.sr-watch-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:0 0 16px; }
+.sr-watch-heading h2 { font-size:clamp(21px,2.7vw,30px); line-height:1.1; margin:0; letter-spacing:-.04em; }
+.sr-watch-nav { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 20px; }
+.sr-watch-nav .outline-link { display:inline-flex; justify-content:center; align-items:center; min-height:43px; padding:11px 14px; }
+.sr-watch-nav .outline-link[aria-disabled="true"] { opacity:.38; pointer-events:none; }
+.sr-auto-next { display:flex; align-items:center; gap:8px; margin-left:auto; font:11px 'JetBrains Mono',monospace; color:#dadada; cursor:pointer; }
+.sr-auto-next input { width:17px; height:17px; accent-color:var(--yellow); }
+.sr-watch-carousel { display:grid; grid-auto-flow:column; grid-auto-columns:clamp(180px,25vw,260px); gap:14px; overflow-x:auto; overscroll-behavior-inline:contain; scroll-snap-type:x mandatory; padding:2px 2px 16px; scrollbar-color:var(--yellow) #222; }
+.sr-watch-carousel > a { scroll-snap-align:start; min-width:0; }
+.sr-watch-carousel .sr-episode-card, .sr-watch-carousel .sr-related-card { display:flex; flex-direction:column; border:1px solid #383838; background:#121212; height:100%; min-height:215px; overflow:hidden; transition:transform .2s ease,border-color .2s ease,background .2s ease; }
+.sr-watch-carousel a:hover, .sr-watch-carousel a:focus-visible { border-color:var(--yellow); background:#1a1a1a; transform:translateY(-2px); }
+.sr-watch-carousel a[aria-current="page"] { border-color:var(--yellow); }
+.sr-watch-thumb { position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; background:linear-gradient(135deg,#2d2d2d,#111); display:flex; align-items:center; justify-content:center; }
+.sr-watch-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.sr-watch-number { position:absolute; top:8px; left:9px; background:#080808dd; border:1px solid #666; color:var(--yellow); padding:5px 8px; font:10px 'JetBrains Mono',monospace; }
+.sr-watch-info { display:flex; flex-direction:column; gap:6px; padding:13px; flex:1; }
+.sr-watch-info strong { font-size:15px; line-height:1.25; }
+.sr-watch-info small { color:#aaa; font:10px/1.45 'JetBrains Mono',monospace; }
+.sr-carousel-controls { display:flex; gap:8px; }
+.sr-carousel-controls button { display:grid; place-items:center; width:36px; height:36px; border:1px solid #666; background:#141414; color:#fff; }
+.sr-carousel-controls button:hover { border-color:var(--yellow); color:var(--yellow); }
+.sr-watch-empty { color:#aaa; font-size:13px; line-height:1.6; margin:0; }
+/* Respect OS motion preference, mobile touch and the existing sharp-edge visual system. */
+@media (hover:none) { .sr-watch-carousel a:hover { transform:none; } }
+@media (prefers-reduced-motion:reduce) { .sr-watch-carousel,.sr-watch-carousel a { scroll-behavior:auto; transition:none; } }
+@media (max-width:610px) {
+ .interior { padding-top:28px; padding-bottom:54px; }
+ #playback-content .screenroom-video { margin-top:16px; }
+ .sr-watch-extras { margin-top:20px; }
+ .sr-watch-carousel { grid-auto-columns:min(70vw,250px); gap:11px; }
+ .sr-auto-next { flex-basis:100%; margin:7px 0 0; }
+ .sr-watch-nav .outline-link { padding:10px 11px; font-size:10px; }
+}
+
+/* Preserve complete TMDB artwork: use available landscape backdrops in cards and intrinsic sizing everywhere. */
+.card-visual.has-poster { height:auto; min-height:0; display:block; aspect-ratio:16/9; }
+.card-visual.has-poster .card-poster { position:relative; inset:auto; width:100%; height:auto; display:block; object-fit:contain; }
+.detail-art.has-backdrop { align-self:start; min-height:0; height:auto; aspect-ratio:auto; }
+.detail-art.has-backdrop .detail-backdrop { position:relative; inset:auto; width:100%; height:auto; object-fit:contain; display:block; }
+/* Subtle tactile polish without changing sharp edges or the black/yellow/white identity. */
+@media (hover:hover) and (pointer:fine) {
+ .media-card { will-change:transform; transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease; }
+ .media-card:hover { transform:translate3d(0,-4px,0); box-shadow:0 12px 28px #0007,0 0 0 1px #f5c51844; }
+ .episode { transition:border-color .2s ease,background .2s ease; }
+ .episode:hover { border-color:#b79316; background:#171717; }
+}
+@media(prefers-reduced-motion:reduce) { .media-card,.episode {transition:none;transform:none!important;} }
+
+/* Low-cost perspective and restrained glass highlights, never rounded or recolored. */
+.card-kicker { background:rgba(10,10,10,.67); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
+ .media-card:hover { transform:perspective(1100px) rotateX(var(--tilt-x,0deg)) rotateY(var(--tilt-y,0deg)) translate3d(0,-4px,0); }
+ .media-card:hover .card-copy { background:linear-gradient(120deg,#ffffff08,transparent 70%); }
+}
+@media(hover:none) {
+ .media-card:active,.sr-related-card:active,.sr-episode-card:active { border-color:var(--yellow); filter:brightness(1.07); }
+}
