@@ -110,3 +110,52 @@
   .media-card:active,.sr-watch-carousel>a:active{transform:perspective(850px) rotateX(5deg) scale(.985);
     box-shadow:0 8px 23px #000a,0 0 0 1px #f5c51877;}
 }
+
+/* Stable catalog rhythm: complete poster art, equal image frames and aligned CTA rows. */
+.card-grid { align-items:stretch; }
+.media-card { height:100%; }
+.card-visual,.card-visual.has-poster { aspect-ratio:16/9; height:auto; min-height:0; display:grid; place-items:center; }
+.card-visual.has-poster .card-poster { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; }
+.card-copy { flex:1; min-width:0; display:flex; flex-direction:column; }
+.card-copy h3 { min-height:2.3em; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; }
+.card-desc { min-height:4.95em; max-height:4.95em; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden; }
+.card-meta { margin-top:auto; min-height:40px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:9px; }
+.card-meta span:first-child { min-width:0; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; }
+.card-meta span:last-child { white-space:nowrap; text-align:right; }
+.card-action { margin-top:16px; }
+@media (max-width:610px) { .card-desc { min-height:4.95em; } }
+/* The host site's highly specific stage sizing must never override fullscreen geometry. */
+#playback-content .screenroom-video .ssp-player:fullscreen,
+#playback-content .screenroom-video .ssp-player:-webkit-full-screen {
+  width:100%; height:100dvh; min-height:0;
+}
+#playback-content .screenroom-video .ssp-player:fullscreen .ssp-stage,
+#playback-content .screenroom-video .ssp-player:-webkit-full-screen .ssp-stage,
+#playback-content .screenroom-video .ssp-player.ssp-viewport-fullscreen .ssp-stage {
+  height:100%!important; aspect-ratio:auto!important; min-height:0!important;
+}
+#playback-content .screenroom-video .ssp-player:fullscreen .ssp-bottom,
+#playback-content .screenroom-video .ssp-player.ssp-viewport-fullscreen .ssp-bottom {
+  padding-bottom:max(10px, env(safe-area-inset-bottom));
+  padding-left:max(14px, env(safe-area-inset-left));
+  padding-right:max(14px, env(safe-area-inset-right));
+}
+/* Small, accessible page changes without implementing a fragile custom SPA. */
+@view-transition { navigation:auto; }
+::view-transition-old(root) { animation:160ms ease-out both sr-page-exit; }
+::view-transition-new(root) { animation:210ms ease-out both sr-page-enter; }
+@keyframes sr-page-exit { to { opacity:.78; } }
+@keyframes sr-page-enter { from { opacity:.78; transform:translateY(5px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce) {
+  ::view-transition-old(root),::view-transition-new(root){animation:none}
+}
+
+/* Progressive cinematic waves stay behind clickable content and text. */
+.catalog { position:relative; isolation:isolate; }
+.catalog > :not(.sr-cinematic-wave) { position:relative; z-index:1; }
+.sr-cinematic-wave {
+  position:absolute; left:0; right:0; top:-24px; width:100%; height:570px;
+  z-index:0; pointer-events:none; opacity:.9; overflow:hidden;
+}
+@media(max-width:610px){.sr-cinematic-wave{top:0;height:420px;opacity:.55}}
+@media(prefers-reduced-motion:reduce){.sr-cinematic-wave{opacity:.42}}

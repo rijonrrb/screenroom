@@ -141,9 +141,28 @@ async function loadEditor(id){
   seasons.append(section);
  }
  const assets=$('assets-list');assets.replaceChildren();
-  (selected.assets||[]).forEach(a=>{
+ const episodes=new Map((selected.seasons||[]).flatMap(season=>
+  (season.episodes||[]).map(ep=>[Number(ep.id),{
+   season:Number(season.season_number),episode:Number(ep.episode_number),title:ep.title
+  }])));
+ // Sort by the actual season/episode identity, never by when the link was uploaded.
+ const sortedAssets=[...(selected.assets||[])].sort((a,b)=>{
+  const x=episodes.get(Number(a.episode_id)),y=episodes.get(Number(b.episode_id));
+  if(x&&y)return x.season-y.season||x.episode-y.episode||Number(a.id)-Number(b.id);
+  if(x)return -1;if(y)return 1;
+  return String(a.role).localeCompare(String(b.role))||Number(a.id)-Number(b.id);
+ });
+ sortedAssets.forEach(a=>{
    const row=document.createElement('div');row.className='asset-entry';
-   const label=document.createElement('span');label.textContent=a.role+' / '+a.format+' / '+(a.provider||'r2')+' / '+(a.r2_key||a.source_url||'');
+   const info=episodes.get(Number(a.episode_id));
+   const label=document.createElement('span');label.className='asset-label';
+   const heading=document.createElement('strong');
+   heading.textContent=info
+    ? 'S'+String(info.season).padStart(2,'0')+' E'+String(info.episode).padStart(2,'0')+' — '+info.title
+    : a.role==='episode'?'UNASSIGNED EPISODE':a.role.toUpperCase();
+   const source=document.createElement('small');
+   source.textContent=a.format.toUpperCase()+' / '+(a.provider||'r2').toUpperCase()+' / '+(a.r2_key||a.source_url||'');
+   label.append(heading,source);
    const edit=document.createElement('button');edit.className='outline';edit.type='button';edit.textContent='EDIT';
    edit.addEventListener('click',()=>{editAsset(a);$('asset-form').scrollIntoView({behavior:'smooth',block:'center'});});
    const remove=document.createElement('button');remove.className='outline';remove.type='button';remove.textContent='DELETE';

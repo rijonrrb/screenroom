@@ -24806,13 +24806,16 @@ class vg {
   resumeSeconds = 0;
   resumeDialog;
   viewportFullscreen = !1;
+  orientationLocked = !1;
   nativeFullscreenControls = !1;
   universalFullscreenRequested = !1;
   noticeTimer;
   controlTimer;
   seekTimer;
   seekingUI = !1;
-  onFullscreenChange = () => this.revealControls();
+  onFullscreenChange = () => {
+    document.fullscreenElement === this.root ? this.lockLandscapeIfSupported() : this.unlockLandscapeIfNeeded(), this.revealControls();
+  };
   revealControls() {
     this.root.classList.remove("ssp-idle"), this.root.style.cursor = "", this.controlTimer !== void 0 && window.clearTimeout(this.controlTimer), document.fullscreenElement === this.root && !this.media().paused && (this.controlTimer = window.setTimeout(() => {
       document.fullscreenElement !== this.root || this.media().paused || !this.settings.hidden || !this.quickAudio.hidden || !this.quickCaptions.hidden || (this.root.classList.add("ssp-idle"), this.root.style.cursor = "none");
@@ -25407,11 +25410,35 @@ class vg {
   onViewportKeyDown = (e) => {
     this.viewportFullscreen && e.key === "Escape" && (e.preventDefault(), this.exitViewportFullscreen());
   };
+  onViewportResize = () => this.updateViewportLandscape();
+  updateViewportLandscape() {
+    this.root.classList.toggle(
+      "ssp-simulated-landscape",
+      this.viewportFullscreen && window.innerHeight > window.innerWidth
+    );
+  }
+  async lockLandscapeIfSupported() {
+    const e = screen.orientation;
+    if (!(!e || typeof e.lock != "function"))
+      try {
+        await e.lock("landscape"), document.fullscreenElement === this.root ? this.orientationLocked = !0 : e.unlock?.();
+      } catch {
+      }
+  }
+  unlockLandscapeIfNeeded() {
+    if (this.orientationLocked) {
+      this.orientationLocked = !1;
+      try {
+        screen.orientation?.unlock?.();
+      } catch {
+      }
+    }
+  }
   enterViewportFullscreen() {
-    this.viewportFullscreen || (this.root.classList.add("ssp-viewport-fullscreen"), document.documentElement.classList.add("ssp-viewport-lock"), this.viewportFullscreen = !0, this.revealControls());
+    this.viewportFullscreen || (this.root.classList.add("ssp-viewport-fullscreen"), document.documentElement.classList.add("ssp-viewport-lock"), this.viewportFullscreen = !0, this.updateViewportLandscape(), window.addEventListener("resize", this.onViewportResize), window.visualViewport?.addEventListener("resize", this.onViewportResize), this.revealControls());
   }
   exitViewportFullscreen() {
-    this.viewportFullscreen && (this.root.classList.remove("ssp-viewport-fullscreen"), document.documentElement.classList.remove("ssp-viewport-lock"), this.viewportFullscreen = !1, this.revealControls());
+    this.viewportFullscreen && (window.removeEventListener("resize", this.onViewportResize), window.visualViewport?.removeEventListener("resize", this.onViewportResize), this.root.classList.remove("ssp-viewport-fullscreen", "ssp-simulated-landscape"), document.documentElement.classList.remove("ssp-viewport-lock"), this.viewportFullscreen = !1, this.revealControls());
   }
   async toggleFullscreen() {
     if (this.viewportFullscreen) {
@@ -25510,7 +25537,7 @@ class vg {
     }
   }
   destroy() {
-    this.exitViewportFullscreen(), document.removeEventListener("keydown", this.onViewportKeyDown), this.universalDestroyed = !0, this.universal?.destroy?.(), this.universal?.remove(), this.universalTrackTimer !== void 0 && window.clearInterval(this.universalTrackTimer), Number.isFinite(this.media().currentTime) && this.media().currentTime > 0 && Number.isFinite(this.media().duration) && this.media().duration - this.media().currentTime >= 15 && this.storageSet(Wt + this.options.id, String(Math.floor(this.media().currentTime))), this.root.removeEventListener("keydown", this.onKeyDown), document.removeEventListener("fullscreenchange", this.onFullscreenChange), this.noticeTimer !== void 0 && window.clearTimeout(this.noticeTimer), this.controlTimer !== void 0 && window.clearTimeout(this.controlTimer), this.seekTimer !== void 0 && window.clearTimeout(this.seekTimer), this.video.removeEventListener("webkitendfullscreen", this.onNativeFullscreenEnd), this.hls?.destroy(), this.video.pause(), this.video.removeAttribute("src"), this.video.load(), this.root.remove();
+    this.exitViewportFullscreen(), this.unlockLandscapeIfNeeded(), document.removeEventListener("keydown", this.onViewportKeyDown), this.universalDestroyed = !0, this.universal?.destroy?.(), this.universal?.remove(), this.universalTrackTimer !== void 0 && window.clearInterval(this.universalTrackTimer), Number.isFinite(this.media().currentTime) && this.media().currentTime > 0 && Number.isFinite(this.media().duration) && this.media().duration - this.media().currentTime >= 15 && this.storageSet(Wt + this.options.id, String(Math.floor(this.media().currentTime))), this.root.removeEventListener("keydown", this.onKeyDown), document.removeEventListener("fullscreenchange", this.onFullscreenChange), this.noticeTimer !== void 0 && window.clearTimeout(this.noticeTimer), this.controlTimer !== void 0 && window.clearTimeout(this.controlTimer), this.seekTimer !== void 0 && window.clearTimeout(this.seekTimer), this.video.removeEventListener("webkitendfullscreen", this.onNativeFullscreenEnd), this.hls?.destroy(), this.video.pause(), this.video.removeAttribute("src"), this.video.load(), this.root.remove();
   }
 }
 export {

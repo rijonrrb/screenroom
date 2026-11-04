@@ -36,9 +36,16 @@ jobs:
           node --check screenroom-server/server.js
           node --check screenroom-server/studio/studio.js
           node --check watch/assets/screenroom.js
+          node --check watch/assets/cinematic-wave.js
+          node --check scripts/qa_smoke_playwright.cjs
           python -m py_compile scripts/deploy_ftps.py
           python scripts/deploy_ftps.py --mode screenroom-web --dry-run
           python scripts/deploy_ftps.py --mode screenroom-api --dry-run
+      - name: Responsive frontend and Studio smoke tests (Playwright)
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts playwright@1.64.1
+          npx playwright install --with-deps chromium
+          node scripts/qa_smoke_playwright.cjs
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
