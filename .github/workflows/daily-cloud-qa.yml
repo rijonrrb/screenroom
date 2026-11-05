@@ -1,0 +1,43 @@
+name: Daily Cloud QA
+on:
+  schedule:
+    - cron: '0 2 * * *' # 08:00 Asia/Dhaka (UTC+6)
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: screenroom-server/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: screenroom-server
+      - run: npm test
+        working-directory: screenroom-server
+      - name: Browser smoke tests
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts playwright@1.64.1
+          npx playwright install --with-deps chromium
+          node scripts/qa_smoke_playwright.cjs
+      - name: Read-only live health checks
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          targets = [('https://screenroom.devrijonn.com/', 'html'), ('https://screenroom.devrijonn.com/screenroom-api/health', 'json')]
+          for url, kind in targets:
+              req = urllib.request.Request(url, headers={'User-Agent':'ScreenroomCloudQA/1.0'})
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  body = response.read(65536)
+                  assert response.status == 200, (url, response.status)
+                  if kind == 'html':
+                      assert b'<html' in body.lower(), url
+                  else:
+                      assert json.loads(body).get('ok') is True, url
+                  print('PASS', url)
+          PY
