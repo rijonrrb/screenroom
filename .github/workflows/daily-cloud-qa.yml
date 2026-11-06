@@ -41,3 +41,19 @@ jobs:
                       assert json.loads(body).get('ok') is True, url
                   print('PASS', url)
           PY
+      - name: Publish QA run summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          {
+            echo "## Daily Cloud QA — ${JOB_STATUS}"
+            echo ""
+            echo "- Repository: ${REPO}"
+            echo "- Run: https://github.com/${REPO}/actions/runs/${RUN_ID}"
+            echo "- Scheduled time: 08:00 Asia/Dhaka (02:00 UTC; GitHub schedules may be delayed)"
+            echo "- Result: ${JOB_STATUS}"
+            echo "- Review failed steps and logs using the run link."
+          } >> "$GITHUB_STEP_SUMMARY"
