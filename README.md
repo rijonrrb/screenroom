@@ -2,8 +2,7 @@
 
 **A movie-and-series discovery and playback project combining a curated catalog, content management, and a modern viewing experience.**
 
-[Live Website](https://screenroom.devrijonn.com/) · [Source Code](https://github.com/rijonrrb/screenroom)
-
+[Live Website](https://screenroom.devrijonn.com/)
 ## Overview
 
 SCREENROOM is an independent full-stack web application for browsing, organizing, and playing authorized movies and series. It connects a responsive audience-facing catalog to a dedicated content-management experience and an integrated video player.
