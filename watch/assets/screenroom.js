@@ -169,9 +169,16 @@ function convertTitle(x){
  };
 }
 async function getAPI(route){
- const response=await fetch(API_BASE+route,{signal:AbortSignal.timeout(5500)});
- if(!response.ok)throw new Error('API returned '+response.status);
- return response.json();
+ // Avoid AbortSignal.timeout(), which is unsupported on older Samsung/Tizen browsers.
+ const controller=typeof AbortController==='function'?new AbortController():null;
+ const timeoutId=controller?setTimeout(()=>controller.abort(),12000):null;
+ try{
+  const response=await fetch(API_BASE+route,controller?{signal:controller.signal}:{});
+  if(!response.ok)throw new Error('API returned '+response.status);
+  return await response.json();
+ }finally{
+  if(timeoutId!==null)clearTimeout(timeoutId);
+ }
 }
 async function hydrateData(){
  if(location.hostname!=='screenroom.devrijonn.com')return;
