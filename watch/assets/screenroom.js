@@ -11,6 +11,8 @@ const q=s=>document.querySelector(s);
 const params=new URLSearchParams(location.search);
 const base=document.body.dataset.watchBase||'./';
 const page=document.body.dataset.page;
+const isSamsungTV=/(?:Tizen|SMART[-_ ]?TV|SmartTV|Samsung.*TV|TV.*Samsung)/i.test(navigator.userAgent);
+if(isSamsungTV)document.documentElement.classList.add('sr-tv');
 const titleHref=t=>base+(t.kind==='series'?'series/':'title/')+'?id='+encodeURIComponent(t.id);
 const playHref=(t,season,episode)=>base+'play/?id='+encodeURIComponent(t.id)+(season?'&season='+encodeURIComponent(season):'')+(episode?'&episode='+encodeURIComponent(episode):'');
 const getTitle=()=>titles.find(t=>t.id===params.get('id'));
@@ -28,6 +30,7 @@ function card(t){
   +'<div class="card-action">VIEW '+(t.kind==='series'?'EPISODES':'DETAILS')+' ↗</div></div></a>';
 }
 function applyCardTilt(grid){
+  if(isSamsungTV)return;
  if(!window.matchMedia('(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference)').matches)return;
  grid.querySelectorAll('.media-card').forEach(card=>{
    let frame=0;
@@ -61,9 +64,11 @@ function render(){const term=search.value.trim().toLowerCase();const filtered=ti
 search.addEventListener('input',render);
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>{const selected=x===b;x.classList.toggle('active',selected);x.setAttribute('aria-pressed',String(selected))});render()}));
 render();
-void import('./cinematic-wave.js?v=0.3.6')
- .then(({mountCinematicWave})=>mountCinematicWave(document.querySelector('.catalog')))
- .catch(()=>{ /* Decorative effect must never prevent catalog navigation. */ });
+if(!isSamsungTV){
+  void import('./cinematic-wave.js?v=0.3.6')
+   .then(({mountCinematicWave})=>mountCinematicWave(document.querySelector('.catalog')))
+   .catch(()=>{ /* Decorative effect must never prevent catalog navigation. */ });
+}
 }
 function detail(t){if(!t){return '<div class="empty">This title is not available in the preview catalog. <a href="'+base+'">BACK TO CATALOG ↗</a></div>'}
 return '<div class="detail-hero"><div><p class="crumb"><a href="'+base+'">SCREENROOM</a> / '+(t.kind==='series'?'SERIES':'MOVIES')+' / '+escapeHtml(t.title.toUpperCase())+'</p><div class="eyebrow">AN ORIGINAL SCREENROOM PREVIEW</div><h1 class="detail-headline">'+escapeHtml(t.title.toUpperCase())+'<span class="dot">.</span></h1><div class="detail-info"><span class="pill key">'+(t.kind==='series'?'SERIES':'FILM')+'</span><span class="pill">'+t.year+'</span><span class="pill">'+escapeHtml(t.genre)+'</span>'+(t.rating?'<span class="pill">'+escapeHtml(t.rating)+'</span>':'')+(t.length?'<span class="pill">'+escapeHtml(t.length)+'</span>':'')+'</div><p class="detail-description">'+escapeHtml(t.description)+'</p><div class="detail-actions"><a class="primary-btn" href="'+(t.kind==='series'&&t.seasons.length&&t.seasons[0].episodes.length?playHref(t,t.seasons[0].number,t.seasons[0].episodes[0].number):playHref(t))+'">▶ WATCH NOW</a><button class="ghost-btn" id="trailer-btn" type="button">TRAILER</button></div></div><div class="detail-art'+(t.backdrop_url?' has-backdrop':'')+'" data-mark="'+t.symbol+'" style="'+colors(t)+'">'+(t.backdrop_url?'<img class="detail-backdrop" src="'+escapeHtml(t.backdrop_url)+'" alt="">':'<span>VISUAL PLACEHOLDER / '+t.year+'</span>')+'</div></div>'+(previewNotice?'<div class="notice-box">'+escapeHtml(previewNotice)+'</div>':'');}

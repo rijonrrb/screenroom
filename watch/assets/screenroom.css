@@ -159,3 +159,27 @@
 }
 @media(max-width:610px){.sr-cinematic-wave{top:0;height:420px;opacity:.55}}
 @media(prefers-reduced-motion:reduce){.sr-cinematic-wave{opacity:.42}}
+
+
+/* Samsung smart TV: preserve catalog/navigation while avoiding expensive animations. */
+html.sr-tv{scroll-behavior:auto}
+html.sr-tv .sr-cinematic-wave{display:none!important}
+html.sr-tv .topbar,html.sr-tv .card-kicker{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+html.sr-tv .media-card,
+html.sr-tv .media-card:hover,
+html.sr-tv .media-card .card-poster,
+html.sr-tv .media-card:hover .card-poster,
+html.sr-tv .sr-watch-carousel a,
+html.sr-tv .sr-watch-carousel a:hover{
+  transition:none!important;
+  animation:none!important;
+  transform:none!important;
+  box-shadow:none!important;
+  filter:none!important;
+  will-change:auto!important;
+}
+html.sr-tv .sr-watch-carousel{scroll-behavior:auto!important}
+html.sr-tv::view-transition-old(root),html.sr-tv::view-transition-new(root){animation:none!important}
