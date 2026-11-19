@@ -226,7 +226,11 @@ async function mountStream(t,ep,episodeControls={}){
   new module.SecureStreamPlayer({
    container:div,src:stream.url,id:'screenroom-'+t.id+(ep?'-'+ep.id:''),
    title:t.title+(ep?' — '+ep.title:''),poster:t.backdrop_url||t.poster_url||undefined,
-    showWatermarkControl:false,preferOriginalMediaEngine:stream.format==='mp4'&&!appleMobile,
+    showWatermarkControl:false,
+    // Prefer hardware-accelerated native MP4 playback on Android as on iOS.
+    // WASM/original-container decoding can cause sustained dropped frames on mobile CPUs.
+    // Users still retain the original-container path for MKV and other non-native formats.
+    preferOriginalMediaEngine:stream.format==='mp4'&&!appleMobile&&!/Android/i.test(navigator.userAgent),
     playlist:t.kind==='series'?{previous:episodeControls.previous,next:episodeControls.next}:undefined,
     onEnded:episodeControls.onEnded
   });
